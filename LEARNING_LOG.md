@@ -8,8 +8,8 @@ Mỗi Module một entry: **Đã làm gì · Quyết định và vì sao · Vấ
 
 ### Đã làm gì
 - Cài Spec Kit 1.2.3, `specify init` với Claude (commit `chore: init speckit`).
-- Đặt câu hỏi cho PO về lượt chơi, tracking, ngân sách hiệu năng, tắt game giữa ván, nghĩa của "công bằng". Câu trả lời ghi trong `docs/product-brief.md` → *PO Q&A*.
-- Lưu brief vào `docs/product-brief.md` với `Version: 1.0.0`.
+- Đặt câu hỏi cho PO về lượt chơi, tracking, ngân sách hiệu năng, tắt game giữa ván, nghĩa của "công bằng" (câu trả lời tóm tắt ở mục *Quyết định* bên dưới).
+- (2026-11-04) Bỏ `docs/product-brief.md`: brief trong guide không đúng với thực tế lúc khởi tạo GameHub.
 
 ### Quyết định và vì sao
 - **Server sở hữu lượt chơi và quà; client chỉ hiển thị.** Vì "công bằng" và chống gian lận: client không đáng tin.
@@ -28,7 +28,7 @@ Mỗi Module một entry: **Đã làm gì · Quyết định và vì sao · Vấ
 - Câu hỏi PO đầu tiên còn chung chung; chưa nghĩ tới các cụm mơ hồ trong brief làm đổi thiết kế ("công bằng", "bundle nhỏ", tắt game giữa ván).
 
 ### Soundbite phỏng vấn (Q1)
-> Tôi bắt đầu từ một product brief có version (`docs/product-brief.md` v1.0.0). Trước khi viết spec, tôi soi các cụm mơ hồ như "nhận quà công bằng" hay "bundle nhỏ" và hỏi PO, vì đó là chỗ AI sẽ tự đoán nếu spec im lặng. Câu trả lời biến thành quyết định cụ thể (server quyết quà, trạng thái bảo trì không trừ lượt), rồi mới tách thành các feature spec. Code chỉ được viết sau khi spec đã được duyệt.
+> Trước khi viết spec, tôi soi các cụm mơ hồ như "nhận quà công bằng" hay "bundle nhỏ" và hỏi PO, vì đó là chỗ AI sẽ tự đoán nếu spec im lặng. Câu trả lời biến thành quyết định cụ thể (server quyết quà, trạng thái bảo trì không trừ lượt), rồi mới tách thành các feature spec. Code chỉ được viết sau khi spec đã được duyệt.
 
 ---
 
