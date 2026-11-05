@@ -1,7 +1,7 @@
 <!--
 Sync Impact Report
-- Version change: 1.0.0 → 1.0.1 (PATCH)
-- Modified principles: III. Verified Against the Spec — fixed missing backtick in tag example `[006:FR-001]`; no change in meaning
+- Version change: 1.0.1 → 1.1.0 (MINOR)
+- Modified principles: IV. Simplicity — the reason for a new dependency, service or abstraction may also be recorded in the PR description when the change is exempt from a spec under Principle I (such changes have no plan). Guidance materially expanded; no rule removed.
 - Added sections: none
 - Removed sections: none
 - Templates: no update needed
@@ -37,7 +37,7 @@ Rationale: tests written from the spec check intent, not just what the AI happen
 
 ### IV. Simplicity
 
-- No new dependency, service, or abstraction is added unless the reason is recorded in the plan and approved by the owner.
+- No new dependency, service, or abstraction is added unless the reason is recorded in the plan and approved by the owner. For changes exempt under Principle I (no spec, so no plan), the reason is recorded in the PR description instead.
 
 Rationale: AI adds complexity cheaply; removing it is expensive.
 
@@ -65,4 +65,4 @@ GameHub is a repository of HTML5 mini-games.
 - A deviation from any principle is allowed only if it is recorded in the plan's Complexity Tracking table.
 - Growth rule: when the same defect type is found twice in review, or the same instruction has to be given to the AI twice, it MUST be turned into a rule (a lint or CI check preferred over prose) and the MINOR version bumped.
 
-**Version**: 1.0.1 | **Ratified**: 2026-11-04 | **Last Amended**: 2026-11-05
+**Version**: 1.1.0 | **Ratified**: 2026-11-04 | **Last Amended**: 2026-11-05
