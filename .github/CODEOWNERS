@@ -1,0 +1,13 @@
+# Paths whose changes need the owner's review (constitution Principle II).
+# Later rules override earlier ones; keep the most specific paths last.
+
+# Specs and project rules
+/specs/                @nhatsinh92
+/.specify/memory/      @nhatsinh92
+/.specify/templates/   @nhatsinh92
+/CLAUDE.md             @nhatsinh92
+
+# CI, governance, and the guardrail configs AI code must pass
+/.github/              @nhatsinh92
+/packages/eslint-config/      @nhatsinh92
+/packages/typescript-config/  @nhatsinh92
