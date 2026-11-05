@@ -1,0 +1,78 @@
+# Deterministic PR gates. Every PR (AI-generated or hand-written) passes the
+# same gates. See docs/sdd/ci.md for what each gate blocks.
+name: pr
+
+on:
+  pull_request:
+    branches: [main]
+    # labeled/unlabeled: re-run guard-deps when `deps-approved` is added/removed
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+  push:
+    branches: [main]
+
+# Least privilege: read-only token for every job unless a job widens it.
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: lint, types, tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      # Actions are pinned to a commit SHA (supply-chain safety); the tag is in the comment.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1 (reads packageManager)
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24 # matches engines.node >=24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # All packages for now (one package). Switch to --filter=...[origin/main]
+      # when there are enough packages for it to save time.
+      - run: pnpm turbo run lint check-types test
+
+  secrets:
+    name: secret scan (gitleaks)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read # gitleaks lists the PR's commits
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # scan the full history of the PR
+      - uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # No PR comments, so the job needs no write permission. Findings are in the job log/summary.
+          GITLEAKS_ENABLE_COMMENTS: false
+
+  guard-deps:
+    name: dependency approval
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: Fail if the lockfile changed without the deps-approved label
+        # PR data is passed via env, never interpolated into the script (script injection).
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          APPROVED: ${{ contains(github.event.pull_request.labels.*.name, 'deps-approved') }}
+        run: |
+          if git diff --quiet "$BASE_SHA" HEAD -- pnpm-lock.yaml; then
+            echo "pnpm-lock.yaml unchanged."
+          elif [ "$APPROVED" = "true" ]; then
+            echo "pnpm-lock.yaml changed; deps-approved label present."
+          else
+            echo "::error file=pnpm-lock.yaml::Lockfile changed. Record the reason for each new dependency (constitution Principle IV), then add the 'deps-approved' label."
+            exit 1
+          fi
