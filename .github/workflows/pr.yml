@@ -34,7 +34,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       # All packages for now (one package). Switch to --filter=...[origin/main]
       # when there are enough packages for it to save time.
-      - run: pnpm turbo run lint check-types test
+      - run: pnpm turbo run lint check-types test --continue
 
   secrets:
     name: secret scan (gitleaks)
