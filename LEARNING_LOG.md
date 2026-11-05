@@ -35,3 +35,13 @@ Mỗi Module một entry: **Đã làm gì · Quyết định và vì sao · Vấ
 ## Nợ
 
 - **M0:** chưa tự liệt kê 5 rủi ro kỹ thuật và chưa tự lập luận cách tách brief thành feature (đã xem bản tham chiếu của mentor). Trả lại trước Module 14.
+
+## Module 1 - Constitution, policy, scaffold
+
+|Principle | Loại lỗi nó chặn | Có thể tự động hoá khi nào|
+|----------|------------------|---------------------------|
+| I. Spec-First | Code sinh ra không đúng yêu cầu | PR phải có spec |
+| II. Humans Decide | AI tự merge code lỗi vào main | branch protection, CODEOWNERS, AI trong CI chỉ có quyền contents:read |
+| III. Verified | Test chỉ xác nhận lại code AI, kể cả chỗ sai; FR bị bỏ sót mà không ai biết | spec-trace (coverrage) |
+| IV. Simplicity | Phantom package (AI bịa ra package không tồn tại), rủi ro supply chain, abstraction thừa | guard-deps cho dependency. Abstraction thừa thì luôn cần người đánh giá |
+| V. No Secrets | Lộ token hay PII, không thu hồi được | gitleaks cho secret, contract test cho telemetry |
