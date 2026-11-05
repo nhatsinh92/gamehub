@@ -1,15 +1,10 @@
 <!--
 Sync Impact Report
-- Version change: (template, unversioned) → 1.0.0
-- Modified principles (placeholder → title):
-  - [PRINCIPLE_1_NAME] → I. Spec-First
-  - [PRINCIPLE_2_NAME] → II. Humans Decide, AI Proposes
-  - [PRINCIPLE_3_NAME] → III. Verified Against the Spec
-  - [PRINCIPLE_4_NAME] → IV. Simplicity
-  - [PRINCIPLE_5_NAME] → V. No Secrets or Personal Data
-- Added sections: Project Context (SECTION_2), Governance
+- Version change: 1.0.0 → 1.0.1 (PATCH)
+- Modified principles: III. Verified Against the Spec — fixed missing backtick in tag example `[006:FR-001]`; no change in meaning
+- Added sections: none
 - Removed sections: none
-- Templates: not modified (they read this file at runtime)
+- Templates: no update needed
 - Deferred TODOs: none
 -->
 
@@ -35,7 +30,7 @@ Rationale: accountability stays with people.
 
 ### III. Verified Against the Spec
 
-- Every functional requirement MUST have at least one test tagged with its feature and requirement ID (e.g. [006:FR-001]`) before merge.
+- Every functional requirement MUST have at least one test tagged with its feature and requirement ID (e.g. `[006:FR-001]`) before merge.
 - Logic is test-first: its test MUST be seen failing before the code that satisfies it exists.
 
 Rationale: tests written from the spec check intent, not just what the AI happened to write.
@@ -70,4 +65,4 @@ GameHub is a repository of HTML5 mini-games.
 - A deviation from any principle is allowed only if it is recorded in the plan's Complexity Tracking table.
 - Growth rule: when the same defect type is found twice in review, or the same instruction has to be given to the AI twice, it MUST be turned into a rule (a lint or CI check preferred over prose) and the MINOR version bumped.
 
-**Version**: 1.0.0 | **Ratified**: 2026-11-04 | **Last Amended**: 2026-11-04
+**Version**: 1.0.1 | **Ratified**: 2026-11-04 | **Last Amended**: 2026-11-05
