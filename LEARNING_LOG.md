@@ -85,8 +85,50 @@ Mỗi Module một entry: **Đã làm gì · Quyết định và vì sao · Vấ
 
 ---
 
+## Module 2 — CI/CD nền bằng GitHub Actions (2026-11-05)
+
+### Đã làm gì
+- `.github/workflows/pr.yml` (PR #1), 3 job:
+  - `verify`: `pnpm turbo run lint check-types test` (thêm `--continue` ở PR #6);
+  - `secrets`: gitleaks trên mọi commit của PR;
+  - `guard-deps`: lockfile đổi mà thiếu label `deps-approved` → fail.
+- `.github/CODEOWNERS` + `.github/pull_request_template.md` (PR #2). Template có checklist theo 5 principle và mục *AI assistance*.
+- Ruleset trên `main`: bắt buộc qua PR, bắt buộc 3 check xanh.
+- 3 PR phá cố ý, **giao cho 3 agent Claude Code chạy song song**, mỗi agent một git worktree, prompt có kết quả dự kiến và giới hạn (không merge, không đóng PR, không sửa file ngoài phạm vi). Kết quả:
+
+  | PR | Gate | Kết quả |
+  |---|---|---|
+  | A: thêm `picocolors` | `guard-deps` | Đỏ, `APPROVED: false`, merge `BLOCKED`. Có label → <kết quả bước 7> |
+  | B: token giả `ghp_…`, rồi xoá ở commit sau | `secrets` | Đỏ, `github-pat` ở commit thêm token, dù diff cuối không còn token |
+  | C: hàm 61 dòng | `verify` → lint | Đỏ, đúng 1 lỗi `max-lines-per-function`, merge `BLOCKED` |
+- `docs/sdd/ci.md`: mỗi gate chặn gì, principle nào, bằng chứng; 7 quyết định thiết kế; hạn chế đã biết.
+
+### Quyết định và vì sao
+- **Gate tất định trước, AI sau.** Code AI và code người viết qua cùng một `pr.yml`. Bước AI review (nếu có) chỉ comment, không bao giờ là gate.
+- **Quyền tối thiểu:** mặc định `contents: read`; `secrets` thêm `pull-requests: read`; tắt comment của gitleaks để không job nào cần quyền ghi.
+- **Ghim action theo commit SHA**, tag để trong comment: tag có thể bị dời sang code khác (vụ `tj-actions/changed-files`, 03/2025), SHA thì không. Annotated tag phải lấy SHA của commit, không lấy SHA của đối tượng tag.
+- **Dữ liệu PR đi qua `env`**, không chèn `${{ }}` vào `run:` (chống script injection).
+- **Không path filter cấp workflow:** check bắt buộc không bao giờ báo kết quả → PR kẹt. `if:` cấp job thì khác: job skipped được tính là đạt.
+- **Chưa `--filter=...[origin/main]`** (1 package), **chưa `pnpm audit`** (advisory mới làm PR fail dù PR không đổi gì → nên chạy theo lịch).
+- **Chưa bật required Code Owner review:** làm một mình thì tác giả không tự approve được. Bật khi AI mở PR (tác giả là bot, rule có tác dụng thật).
+- **AI review:** gói Pro dùng được (`claude setup-token` → secret `CLAUDE_CODE_OAUTH_TOKEN`), nhưng dùng chung hạn mức. Hoãn; khi làm thì chỉ chạy với label `ai-review`, không chạy cho PR từ fork.
+
+### Vấp ở đâu / phát hiện
+- **Agent A dừng vì label chưa tồn tại** (bước chuẩn bị bị bỏ sót). Đúng hành vi: prompt cấm tạo label, agent hỏi xin phép thay vì tự lách.
+- **Lint fail che mất test:** mặc định turbo dừng khi một task fail → thêm `--continue` (PR #6). Phát hiện nhờ agent C ghi rõ phần nó *chưa* kiểm.
+- **Gitleaks chạy sau khi push:** lúc nó đỏ, secret đã ở trên GitHub, phải rotate. Push protection của GitHub không chặn token giả. Cần lớp chặn trước: push protection hoặc pre-commit hook.
+- **Gitleaks in email tác giả commit vào log CI** (token thì đã được che). Log Actions của repo public cũng public.
+- `guard-deps` vẫn bắt được dù `picocolors` đã có sẵn trong lockfile (dependency gián tiếp): gate chặn mọi thay đổi lockfile, không chỉ package mới.
+
+### Soundbite phỏng vấn (Q6)
+> Code do AI sinh đi qua đúng bộ gate với code người viết, trong một workflow duy nhất: lint (giới hạn 60 dòng mỗi hàm, 400 dòng mỗi file), type-check, test, gitleaks, và một gate buộc người duyệt mỗi khi lockfile đổi. Mỗi gate được chứng minh bằng một PR cố tình phá. Tôi giao 3 PR đó cho 3 agent chạy song song, rồi tự đọc log để xác nhận từng gate đỏ đúng lý do. Chính quá trình đó lộ ra hai lỗ hổng mà tôi đã sửa hoặc ghi lại: lint fail che mất test, và secret chỉ bị bắt sau khi đã push.
+
+---
+
 ## Nợ
 
 - **M0:** chưa tự liệt kê 5 rủi ro kỹ thuật và chưa tự lập luận cách tách brief thành feature (đã xem bản tham chiếu của mentor). Trả lại trước Module 14.
 - **M1:** ghi lý do bỏ `no-explicit-any` (mục *Quyết định* ở trên).
 - **M1:** làm lại kiểm mutation trên **code được test** (đổi giới hạn trong `base.js` 60 → 61, 400 → 401, thấy test "rejects" đỏ rồi khôi phục). Lần trước mới đổi input của test.
+- **M2:** điền số PR A/B/C và kết quả bước 7 (PR A có label) vào `docs/sdd/ci.md` và entry Module 2.
+- **M2:** kiểm push protection trong Settings → Code security; cân nhắc gitleaks pre-commit hook.
