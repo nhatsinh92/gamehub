@@ -8,7 +8,8 @@ export type SpecError = {
     | "missing-version"
     | "invalid-version"
     | "duplicate-id"
-    | "version-not-bumped";
+    | "version-not-bumped"
+    | "version-decreased";
   file: string;
   /** Starts with the path (FR-006). */
   message: string;
@@ -45,6 +46,13 @@ const ENTRY_END = /^(- |\* |#)/;
 const SEMVER = /^\d+\.\d+\.\d+$/;
 
 const normalize = (s: string) => s.replace(/\s+/g, " ").trim();
+
+// Semver order on validated x.y.z: each part compared as an integer (1.10.0 > 1.9.0).
+const semverCmp = (a: string, b: string) => {
+  const x = a.split(".").map(Number);
+  const y = b.split(".").map(Number);
+  return x.reduce((d, n, i) => d || n - (y[i] ?? 0), 0);
+};
 
 // Sorted by prefix, then by the number as an integer (FR-002 before FR-010).
 const byId = (a: string, b: string) =>
@@ -153,8 +161,17 @@ export function diffSpecs(oldSpec: SpecInput, newSpec: SpecInput): DiffResult {
     };
   }
   const contentChanged = a.body !== b.body;
-  // FR-010: only equality matters; version order and bump level are never compared.
-  if (contentChanged && a.version === b.version) {
+  const av = a.version ?? "";
+  const bv = b.version ?? "";
+  // FR-010: a lower version is an error; bump level is never judged.
+  if (semverCmp(bv, av) < 0) {
+    errors.push({
+      code: "version-decreased",
+      file: newSpec.path,
+      message: `${newSpec.path}: Version decreased from ${av} to ${bv}`,
+    });
+  }
+  if (contentChanged && av === bv) {
     errors.push({
       code: "version-not-bumped",
       file: newSpec.path,
