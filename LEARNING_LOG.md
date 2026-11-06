@@ -227,7 +227,15 @@ Mỗi Module một entry: **Đã làm gì · Quyết định và vì sao · Vấ
   - Gắn label `ai-review` → `spec-impact@v1` đăng một comment. Đối chiếu với repo: **đúng cả 2 file nó nêu** — `diff.ts` (~dòng 156, chỉ so bằng nhau, chưa có `version-decreased`) và test `[001:FR-010] accepts a lower new version without error` (`diff.test.ts` dòng 249) đang khẳng định hành vi cũ. Không bịa đường dẫn nào. Nó tự nói rõ chưa mở `cli.ts`/`format.ts` nên đưa vào mục câu hỏi (thực tế `cli.ts` không bị ảnh hưởng: exit code ánh xạ theo kết quả, rule-violation đã là 1). Hỏi đúng: chưa có test cho US2 scenario 4.
   - **AI bỏ sót tài liệu thiết kế:** `contracts/cli.md` (bảng mã lỗi) và `data-model.md` (union `code` và luồng quyết định) đều phải thêm `version-decreased`. Nguyên nhân: prompt v1 chỉ bảo tìm "code and tests". Ứng viên cho `spec-impact@v2`: thêm các tài liệu trong `specs/NNN-*/` (plan, data-model, contracts) vào phạm vi tìm.
 
+- **PR 2 (code)**, branch `001-spec-diff-v2-impl`, prompt dùng chính comment của `spec-impact` cộng phần nó bỏ sót:
+  - cập nhật **có chọn lọc** `contracts/cli.md` và `data-model.md` (thêm `version-decreased`); `plan.md` không đổi; nối Phase 7 (T039–T044) vào `tasks.md`, không đụng task cũ;
+  - red (`e4bb2ec`): sửa test cũ của FR-010 sang hành vi mới, thêm test cho US2 scenario 4, thêm test `1.10.0 → 1.9.0` là giảm (so theo số, không theo chuỗi); 3 test đỏ, 52 test khác xanh;
+  - green (`913de0e`): thêm mã lỗi, hàm so semver và phép kiểm trong `diff.ts`; gate 6/6, **55/55 test**;
+  - spec (`ab1beb4`): Status → Implemented, **2.0.1**; tự kiểm bằng tool: 2.0.0 → 2.0.1 pass, đảo ngược 2 file → `version-decreased`, exit 1.
+  - AI tự khai chưa làm: chưa có test CLI cho exit 1 khi version giảm (exit code ánh xạ theo kết quả, đã được test); `quickstart.md` chưa có kịch bản tay; header các tài liệu thiết kế vẫn ghi spec 2.0.0; commit red không qua được type-check (bình thường với TDD, CI chỉ chạy trên đầu PR).
+
 ### Quyết định và vì sao
+- **Không phải thay đổi spec nào cũng cần 2 PR + AI review.** Mặc định: một PR, commit spec đứng trước commit code, gate `spec-diff` vẫn chạy. Tách 2 PR khi thay đổi là MAJOR hoặc cần người khác (PO) duyệt yêu cầu trước khi làm. Label `ai-review` là tuỳ chọn, dùng khi không chắc phạm vi ảnh hưởng.
 - **Chọn một thay đổi MAJOR làm test cũ phải sửa** (thay vì thêm FR mới như xử lý BOM): đây là trường hợp `spec-impact` có việc thật để làm, và là đúng câu hỏi Q4 (code và test có bám theo spec đã đổi không).
 - **Tách PR spec và PR code**: PR spec được review như một quyết định (có nên đổi yêu cầu không); PR code như việc thực thi. AI không thể lặng lẽ sửa spec cho khớp code nó viết.
 - **Status quay về Approved** trong PR spec, và lên Implemented (bump PATCH) trong PR code.
