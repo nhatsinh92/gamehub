@@ -5,6 +5,7 @@ import type { SpecInput } from "./diff.ts";
 import { formatText } from "./format.ts";
 
 const USAGE = "usage: spec-diff [--json] <old-spec> <new-spec>\n";
+const EXIT = { pass: 0, "rule-violation": 1, "input-error": 2 } as const;
 
 function read(path: string): SpecInput {
   try {
@@ -26,7 +27,7 @@ try {
   } else {
     const r = diffSpecs(read(oldPath), read(newPath));
     process.stdout.write(formatText(r));
-    process.exitCode = r.result === "pass" ? 0 : 2;
+    process.exitCode = EXIT[r.result];
   }
 } catch (err) {
   process.stderr.write(
