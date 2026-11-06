@@ -167,3 +167,83 @@ test("[001:FR-012] exits 2 and reports both a missing Version and a duplicate ID
     stderr: "",
   });
 });
+
+// Returns the raw text when it is not JSON, so extra stdout text fails on toEqual, not on a throw.
+const parse = (s: string): unknown => {
+  try {
+    return JSON.parse(s) as unknown;
+  } catch {
+    return s;
+  }
+};
+
+function runJson(...args: string[]) {
+  const r = run(...args);
+  return { status: r.status, json: parse(r.stdout), stderr: r.stderr };
+}
+
+const passJson = (p: { oldPath: string; newPath: string }) => ({
+  schemaVersion: 1,
+  result: "pass",
+  files: { old: p.oldPath, new: p.newPath },
+  versions: { old: "1.0.0", new: "1.1.0" },
+  contentChanged: true,
+  fr: { added: ["FR-004"], removed: [], changed: ["FR-002"] },
+  sc: { added: [], removed: ["SC-003"], changed: [] },
+  errors: [],
+});
+
+test("[001:FR-008] prints only the JSON with --json first, between or last", () => {
+  const p = writePair();
+  const expected = { status: 0, json: passJson(p), stderr: "" };
+  expect([
+    runJson("--json", p.oldPath, p.newPath),
+    runJson(p.oldPath, "--json", p.newPath),
+    runJson(p.oldPath, p.newPath, "--json"),
+  ]).toEqual([expected, expected, expected]);
+});
+
+test("[001:FR-008] exits 1 with the rule-violation JSON for a missed bump", () => {
+  const p = writeFiles(
+    makeSpec({ fr: fr3 }),
+    makeSpec({ fr: { ...fr3, "FR-002": "B, reworded." } }),
+  );
+  expect(runJson("--json", p.oldPath, p.newPath)).toEqual({
+    status: 1,
+    json: {
+      schemaVersion: 1,
+      result: "rule-violation",
+      files: { old: p.oldPath, new: p.newPath },
+      versions: { old: "1.0.0", new: "1.0.0" },
+      contentChanged: true,
+      fr: { added: [], removed: [], changed: ["FR-002"] },
+      sc: { added: [], removed: [], changed: [] },
+      errors: [
+        {
+          code: "version-not-bumped",
+          file: p.newPath,
+          message: `${p.newPath}: content changed but Version is still 1.0.0`,
+        },
+      ],
+    },
+    stderr: "",
+  });
+});
+
+test("[001:FR-008] rejects --json with one path: usage on stderr, exit 2", () => {
+  const p = writePair();
+  expect(run("--json", p.oldPath)).toEqual({
+    status: 2,
+    stdout: "",
+    stderr: usage,
+  });
+});
+
+test("[001:FR-008] rejects an unknown flag: usage on stderr, exit 2", () => {
+  const p = writePair();
+  expect(run("--yaml", p.oldPath)).toEqual({
+    status: 2,
+    stdout: "",
+    stderr: usage,
+  });
+});
