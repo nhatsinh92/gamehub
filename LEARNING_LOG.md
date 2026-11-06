@@ -98,9 +98,9 @@ Mỗi Module một entry: **Đã làm gì · Quyết định và vì sao · Vấ
 
   | PR | Gate | Kết quả |
   |---|---|---|
-  | A: thêm `picocolors` | `guard-deps` | Đỏ, `APPROVED: false`, merge `BLOCKED`. Có label → <kết quả bước 7> |
-  | B: token giả `ghp_…`, rồi xoá ở commit sau | `secrets` | Đỏ, `github-pat` ở commit thêm token, dù diff cuối không còn token |
-  | C: hàm 61 dòng | `verify` → lint | Đỏ, đúng 1 lỗi `max-lines-per-function`, merge `BLOCKED` |
+  | A (#4): thêm `picocolors` | `guard-deps` | Đỏ, `APPROVED: false`, merge `BLOCKED`. Có label `deps-approved` → chạy lại, xanh |
+  | B (#3): token giả `ghp_…`, rồi xoá ở commit sau | `secrets` | Đỏ, `github-pat` ở commit thêm token, dù diff cuối không còn token |
+  | C (#5): hàm 61 dòng | `verify` → lint | Đỏ, đúng 1 lỗi `max-lines-per-function`, merge `BLOCKED` |
 - `docs/sdd/ci.md`: mỗi gate chặn gì, principle nào, bằng chứng; 7 quyết định thiết kế; hạn chế đã biết.
 
 ### Quyết định và vì sao
@@ -195,8 +195,8 @@ Mỗi Module một entry: **Đã làm gì · Quyết định và vì sao · Vấ
 
 ### Đã làm gì
 - **2a:** thêm job `spec-diff` vào `.github/workflows/pr.yml`: với mỗi `specs/*/spec.md` bị sửa trong PR, lấy bản trên base bằng `git show`, chạy `spec-diff`; spec nào exit khác 0 thì job đỏ.
-  - PR #`<C>` (`ci/spec-diff-gate`, không sửa spec): job in "No spec changed." và xanh.
-  - PR phá cố ý #`<D>` (`ci/spec-diff-gate-failure`): sửa một FR trong spec 001, giữ Version 1.0.1 → job đỏ, `version-not-bumped`. Đóng, không merge.
+  - PR #10 (`ci/spec-diff-gate`, không sửa spec): job in "No spec changed." và xanh.
+  - PR phá cố ý #11 (`ci/spec-diff-gate-failure`): sửa một FR trong spec 001, giữ Version 1.0.1 → job đỏ, `version-not-bumped`. Đóng, không merge.
   - `docs/sdd/ci.md`: thêm dòng `spec-diff` vào bảng Gates; ruleset giờ yêu cầu 4 check.
 
 ### Quyết định và vì sao
@@ -215,7 +215,6 @@ Mỗi Module một entry: **Đã làm gì · Quyết định và vì sao · Vấ
 
 - **M0:** chưa tự liệt kê 5 rủi ro kỹ thuật và chưa tự lập luận cách tách brief thành feature (đã xem bản tham chiếu của mentor). Trả lại trước Module 14.
 - **M1:** làm lại kiểm mutation trên **code được test** (đổi giới hạn trong `base.js` 60 → 61, 400 → 401, thấy test "rejects" đỏ rồi khôi phục). Lần trước mới đổi input của test.
-- **M2:** điền số PR A/B/C và kết quả bước 7 (PR A có label) vào `docs/sdd/ci.md` và entry Module 2.
 - **M2:** kiểm push protection trong Settings → Code security; cân nhắc gitleaks pre-commit hook.
 - **M3:** thêm `specs/` vào `.prettierignore` (PR hạ tầng riêng).
 - **M3:** cân nhắc thêm vào `docs/sdd/spec-first-vs-code-first.md` tiêu chí "output có chương trình khác đọc → chỉ cần contract cho output trước".
