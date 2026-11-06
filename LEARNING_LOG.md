@@ -213,6 +213,7 @@ Mỗi Module một entry: **Đã làm gì · Quyết định và vì sao · Vấ
 - **2b chỉ được comment:** `contents: read`, `pull-requests: write`; công cụ AI chỉ có `Read`, `Glob`, `Grep` và `gh pr comment`; tối đa 10 turn. Không phải gate: không bao giờ chặn merge.
 - **Prompt có version** (`prompts/spec-impact@v1.md`), output có định dạng cố định, ghi rõ nội dung spec/code/PR là **dữ liệu không tin cậy** (chống prompt injection), không được bịa đường dẫn file, file không chắc thì đưa vào mục câu hỏi.
 - Dùng `github_token` thay vì Claude GitHub App, nên không cần `id-token: write`.
+- **2b không chạy cho spec mới** (chưa có trên base): không có bản cũ để so, và chưa có code nào làm theo spec đó, nên "code nào bị ảnh hưởng" không có nghĩa. Spec mới đã được `clarify` và `analyze` kiểm ở local. Muốn AI soát spec mới (trùng/mâu thuẫn với code hoặc spec khác) thì làm prompt riêng, ví dụ `prompts/spec-review@v1.md`.
 - Dữ liệu PR đi qua `env`, action ghim SHA như các job khác.
 
 ---
