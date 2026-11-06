@@ -4,9 +4,9 @@
 
 **Created**: 2026-11-06
 
-**Status**: Approved
+**Status**: Implemented
 
-**Version**: 2.0.0
+**Version**: 2.0.1
 
 **Input**: User description: "a CLI check that compares two versions of the same spec file. Reviewers and CI need to see exactly which requirements changed, and every change must come with a version bump (CLAUDE.md Rule 1)."
 
@@ -126,6 +126,7 @@ A later CI step (for example an AI reviewer) asks for the machine-readable form 
 - New specs (no old version) are skipped by the caller; the check always compares two existing files.
 
 ## Changelog
+- 2.0.1 (2026-11-06): Status → Implemented (FR-010 `version-decreased` done in packages/spec-diff).
 - 2.0.0 (2026-11-06): FR-010 redefined: a lower new version is now a rule violation (`version-decreased`), reversing the 0.2.0 decision to accept it. Updated the matching edge case and added US2 scenario 4. Status back to Approved until the code follows.
 - 1.0.1 (2026-11-06): Status → Implemented.
 - 1.0.0 (2026-11-06): approved by the owner. Also records the removal of the former SC-004 (reviewer reads the change in under 1 minute) and the renumbering of SC-005/SC-006 to SC-004/SC-005.

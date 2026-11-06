@@ -163,4 +163,4 @@ Commit after each green run (T019, T028, T034, T038) so every commit passes lint
 - [X] T041 [US2] Run `pnpm --filter @repo/spec-diff test`; confirm T039 and T040 fail on an assertion and all other tests pass. Commit `test(red): ...`
 - [X] T042 [US2] In `packages/spec-diff/src/diff.ts`, add `"version-decreased"` to `SpecError["code"]` and, after the input-error check in `diffSpecs`, add the error when the new Version is lower than the old (compared part by part as integers). Make T039–T040 pass
 - [X] T043 [US2] Run `pnpm --filter @repo/spec-diff lint check-types test`; everything passes. Commit `feat(green): ...`
-- [ ] T044 Set spec.md Status to Implemented, Version 2.0.1, with a Changelog line (CLAUDE.md Rule 1). Run the full repo gate `pnpm turbo run lint check-types test --continue`
+- [X] T044 Set spec.md Status to Implemented, Version 2.0.1, with a Changelog line (CLAUDE.md Rule 1). Run the full repo gate `pnpm turbo run lint check-types test --continue`
