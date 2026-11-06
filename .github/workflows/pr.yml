@@ -53,6 +53,48 @@ jobs:
           # No PR comments, so the job needs no write permission. Findings are in the job log/summary.
           GITLEAKS_ENABLE_COMMENTS: false
 
+  spec-diff:
+    name: spec version check (spec-diff)
+    # Needs the PR base to compare against, so it runs on PRs only. A skipped job
+    # counts as passing for required checks (see docs/sdd/ci.md).
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # needs the base commit to read the old spec
+      # spec-diff only uses Node built-ins and runs from TypeScript source: no install.
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - name: Run spec-diff on every changed spec
+        # PR data is passed via env, never interpolated into the script (script injection).
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          changed=$(git diff --name-only "$BASE_SHA" HEAD -- 'specs/*/spec.md')
+          if [ -z "$changed" ]; then
+            echo "No spec changed."
+            exit 0
+          fi
+          status=0
+          for path in $changed; do
+            if [ ! -f "$path" ]; then
+              echo "$path: deleted in this PR, skipped."
+              continue
+            fi
+            if ! git cat-file -e "$BASE_SHA:$path" 2>/dev/null; then
+              echo "$path: new spec (not on base), skipped."
+              continue
+            fi
+            git show "$BASE_SHA:$path" > "$RUNNER_TEMP/old.md"
+            echo "::group::$path"
+            node packages/spec-diff/src/cli.ts "$RUNNER_TEMP/old.md" "$path" || status=1
+            echo "::endgroup::"
+          done
+          exit $status
+
   guard-deps:
     name: dependency approval
     if: github.event_name == 'pull_request'
