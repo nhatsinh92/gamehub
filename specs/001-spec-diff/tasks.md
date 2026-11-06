@@ -92,7 +92,7 @@
 - [X] T025 [US2] Extend `diffSpecs` in `packages/spec-diff/src/diff.ts` with the decision flow from data-model.md: collect `unreadable-file` and parse errors from both sides (old first); any input error → `"input-error"`, `contentChanged: null`, empty lists; otherwise, if `contentChanged` and the versions are equal → add `version-not-bumped` and return `"rule-violation"`. Make T020 pass
 - [X] T026 [P] [US2] Extend `formatText` in `packages/spec-diff/src/format.ts` for errors, `?` versions and the shorter `input-error` report. Make T021 pass
 - [X] T027 [US2] In `packages/spec-diff/src/cli.ts`, map `result` to the exit code: `pass` → 0, `rule-violation` → 1, `input-error` → 2 (contracts/cli.md › Exit codes). Make T022 pass
-- [ ] T028 [US2] Run `pnpm --filter @repo/spec-diff lint check-types test`; everything passes
+- [X] T028 [US2] Run `pnpm --filter @repo/spec-diff lint check-types test`; everything passes
 
 **Checkpoint**: US1 and US2 both work (quickstart scenarios 2, 5 and 6).
 
