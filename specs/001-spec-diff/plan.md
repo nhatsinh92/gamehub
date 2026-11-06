@@ -40,7 +40,7 @@ A CLI that takes the old and new contents of one spec file and reports both Vers
 | IV. Simplicity | No runtime dependency. One new dev dependency, `@types/node`, is weighed against two no-dependency options in research R5. The new package itself was decided by the owner. No Markdown parser (R1), no `tsx` or build step (R3) | Pass, **pending owner approval of `@types/node`** (`deps-approved` label) |
 | V. No Secrets or Personal Data | Test fixtures are small made-up spec strings; errors print only paths and IDs | Pass |
 
-**Post-design re-check (after Phase 1)**: unchanged. The design adds no service, abstraction layer or dependency beyond those above. Three pure modules plus one I/O module is the minimum split that keeps each file under the lint limits and keeps I/O out of the core.
+**Post-design re-check (after Phase 1)**: unchanged. The design adds no service, abstraction layer or dependency beyond those above. Two pure modules (`diff.ts`, `format.ts`), one I/O module (`cli.ts`) and one test helper (`fixtures.ts`) is the minimum split that keeps each file under the lint limits and keeps I/O out of the core.
 
 ## Project Structure
 
@@ -64,14 +64,15 @@ specs/001-spec-diff/
 packages/spec-diff/
 ├── package.json         # @repo/spec-diff, "type": "module", private, bin: spec-diff → src/cli.ts;
 │                        # scripts: lint, check-types (tsc --noEmit), test (vitest run)
-├── tsconfig.json        # extends @repo/typescript-config/base.json; noEmit,
-│                        # allowImportingTsExtensions, erasableSyntaxOnly, types: ["node"]
+├── tsconfig.json        # extends @repo/typescript-config/base.json; noEmit, allowJs, checkJs
+│                        # (as packages/eslint-config), allowImportingTsExtensions, erasableSyntaxOnly, types: ["node"]
 ├── eslint.config.js     # re-exports @repo/eslint-config/base (same as packages/eslint-config)
 └── src/
-    ├── diff.ts          # pure: parseSpec(text) + diffSpecs(old: SpecInput, new: SpecInput): DiffResult
+    ├── diff.ts          # pure: parseSpec(path, text) + diffSpecs(old: SpecInput, new: SpecInput): DiffResult
     ├── diff.test.ts     # FR-002..FR-006, FR-009, FR-010, FR-012 and edge cases, on strings
     ├── format.ts        # pure: formatText(result), formatJson(result)
     ├── format.test.ts   # FR-007 (same content in both forms), contract output shape
+    ├── fixtures.ts      # test helper: makeSpec() builds small spec strings for the tests
     ├── cli.ts           # I/O only: parse argv, read files, print, set exit code
     └── cli.test.ts      # FR-001, FR-008, FR-011 and exit codes: spawns `node src/cli.ts` on temp files
 ```

@@ -58,7 +58,9 @@ Stdout holds exactly one JSON object followed by a newline, and nothing else (FR
 | `versions.old`, `versions.new` | string \| `null` | `null` when the file has no valid Version or cannot be read |
 | `contentChanged` | boolean \| `null` | `null` on `input-error` (comparison not run) |
 | `fr`, `sc` | `{ added, removed, changed }`, each `string[]` | IDs only, sorted (FR-004); all empty on `input-error` |
-| `errors` | `{ code, file, message }[]` | Order: old-file errors, then new-file errors, then `version-not-bumped` |
+| `errors` | `{ code, file, message }[]` | Order: old-file errors, then new-file errors (within a file: `unreadable-file` or the Version error first, then `duplicate-id` errors by ID), then `version-not-bumped` |
+
+Key order in the object has no meaning; consumers parse the JSON. The order of items inside arrays is part of the contract.
 
 On a usage error, there is no JSON output (stdout is empty) and the exit code is 2.
 
