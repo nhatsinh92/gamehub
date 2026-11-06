@@ -33,3 +33,28 @@ describe("max-lines: 400", () => {
     expect(await ruleIds("export {};\n".repeat(401))).toContain("max-lines");
   });
 });
+
+describe("TypeScript files", () => {
+  test("accepts type aliases, interfaces and functions using them", async () => {
+    const code = [
+      'export type Kind = "a" | "b";',
+      "export interface Item { kind: Kind; files: { old: string; new: string } }",
+      "export function label(item: Item): Kind {",
+      "  return item.kind;",
+      "}",
+      "",
+    ].join("\n");
+    expect(await ruleIds(code)).toEqual([]);
+  });
+
+  test("accepts a type imported and used only in annotations", async () => {
+    const code = [
+      'import type { Item } from "./item.ts";',
+      "export function name(item: Item): string {",
+      "  return String(item);",
+      "}",
+      "",
+    ].join("\n");
+    expect(await ruleIds(code)).toEqual([]);
+  });
+});

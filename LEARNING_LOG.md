@@ -125,10 +125,73 @@ Mỗi Module một entry: **Đã làm gì · Quyết định và vì sao · Vấ
 
 ---
 
+## Module 3 — Feature 001: `spec-diff` (đang làm, 2026-11-05 → )
+
+### Đã làm gì
+- **Lần 1 (bỏ):** feature `spec-tooling` gồm 3 tool (`spec-lint`, `spec-trace`, `spec-diff`). Sau specify và vài lượt clarify, spec phình ra 20 FR, kèm nhiều luật version (quy ước `redefined`/`wording`, luật riêng cho 0.x, L6 kiểm Status). Reset branch về `main`, làm lại.
+- **Lần 2:** feature `001-spec-diff`, chỉ một tool: so 2 file spec (bản cũ, bản mới), báo version cũ → mới và FR/SC thêm/xoá/sửa, **một luật duy nhất**: nội dung đổi mà version không đổi → lỗi.
+  - specify (3 câu hỏi) → clarify (3 câu) → spec **1.0.0 Approved**.
+  - plan: `research.md` có 5 quyết định, mỗi quyết định ≥ 2 phương án.
+  - tasks: 39 task, 6 phase; analyze 2 lượt (lượt 1: 3 CRITICAL, lượt 2: 0 CRITICAL).
+  - implement lần chạy 1 (Phase 1–3, T001–T019): **xong**. 5 commit `test(red)` (T010–T013) đứng trước 4 commit `feat(green)` (T015–T018); commit T014 ghi "31/31 test fail on behavior"; commit red chỉ chứa test (ví dụ T010: chỉ `diff.parse.test.ts` + `tasks.md`). Thêm 2 cặp red/green sửa `eslint-config` chen giữa. Code: khoảng 190 dòng nguồn (`diff.ts`, `format.ts`, `cli.ts`) và 615 dòng test.
+  - implement lần chạy 2 (Phase 4–6, T020–T038): **xong**, 19 commit, 39/39 task `[X]`. US2: 14 test đỏ (31 test US1 vẫn xanh) trước 4 commit green; US3: 8 test đỏ trước 2 commit green. Gate toàn repo: 6/6 task turbo, 53/53 test của spec-diff, 6/6 của eslint-config. 24 case `diffSpecs` (SC-001 cần ≥ 10), FR-001..FR-012 đều có tag.
+- `CLAUDE.md` thêm **luật 2**: test so toàn bộ giá trị kỳ vọng; test pass trên stub hoặc kết quả rỗng không chứng minh gì.
+
+### Quyết định và vì sao
+- **Thu nhỏ phạm vi còn 1 tool, 1 luật.** Mức bump (MAJOR/MINOR/PATCH) và chiều bump do người quyết, tool không đoán (Principle II).
+- **Luật version giữ như trên `main`** (0.1.0 → 1.0.0 khi duyệt, mỗi thay đổi đều bump). Không thêm luật cho giai đoạn Draft. Spec 001 đi qua 0.1.0 → 0.5.0 → 1.0.0.
+- **Input là 2 đường dẫn file**, việc lấy bản cũ từ git (`git show`) để bên gọi lo. Lõi so sánh là hàm thuần nhận 2 chuỗi, nên test không cần dựng repo git giả (chậm, phụ thuộc môi trường, dễ flaky).
+- **Clarify:**
+  - version giảm: chấp nhận (người quyết);
+  - chỉ đổi khoảng trắng/xuống dòng: không tính là thay đổi;
+  - spec mới (không có bản cũ): ngoài phạm vi, CI tự bỏ qua;
+  - report chỉ ghi ID, không ghi nội dung;
+  - 3 kết quả riêng: pass / vi phạm luật / lỗi input, mỗi kết quả một exit code;
+  - báo mọi lỗi trong một lần chạy.
+- **Plan:**
+  - đọc Markdown theo từng dòng bằng regex, không dùng parser;
+  - output máy đọc được là JSON có `schemaVersion`;
+  - chạy thẳng TypeScript bằng Node 24, không build;
+  - exit code 0/1/2, lỗi bất ngờ cũng thoát mã 2.
+- **Thêm `specs/` vào `.prettierignore`** (thay đổi hạ tầng riêng): Prettier không chỉ đổi khoảng trắng mà còn đổi `*` thành `-` và `*(x)*` thành `_(x)_`.
+- **Status đổi thành Implemented ngay trong PR của code** (bump PATCH 1.0.1), không đợi merge xong mới mở PR khác: khi PR merge, `main` có code và spec khớp nhau ngay, không có khoảng thời gian spec ghi Approved trong khi code đã có; bớt một PR.
+- **Chạy implement 2 lần thay vì 6** (gộp Phase 1–3, rồi 4–6). Vẫn giữ US3 (JSON).
+- **Điểm dừng cho analyze:** tối đa 2 lượt; sửa CRITICAL và lỗi chặn việc implement; phần còn lại để review trên code thật.
+- **Lint của TypeScript** (parser của Babel không hiểu kiểu):
+  - tắt `no-undef` cho file TS (`tsc` đã kiểm tên chưa định nghĩa);
+  - tắt `no-unused-vars` cho file TS và bật `noUnusedLocals`/`noUnusedParameters` trong `@repo/typescript-config` (chuyển việc kiểm sang `tsc`);
+  - cả hai làm test-first; nếu rule thứ ba báo sai thì dừng và xem lại cách làm.
+  - Không chuyển sang `typescript-eslint` được: bản mới nhất (8.72.1, cả canary) chỉ hỗ trợ TypeScript `<6.1.0`, repo dùng 7.0.2. Hướng sau này: đợi bản hỗ trợ TS 7, hoặc hạ TypeScript xuống 6.0.x.
+  - `no-explicit-any` vẫn tắt (quyết định ở Module 1).
+
+### Vấp ở đâu / phát hiện
+- **Lần 1 phình vì cứ thêm luật để vá luật:** sửa luật version ở `CLAUDE.md` làm lộ chỗ trống ở spec của tool kiểm nó (0.x, Status), rồi lại thêm luật. Bài học: giữ luật đơn giản, để người quyết những gì máy không cần đoán.
+- **`/speckit-specify` tự hỏi tối đa 3 câu** cho marker nó để lại; `/speckit-clarify` là bước khác, quét toàn spec (tối đa 5 câu).
+- **AI khuyên bỏ qua clarify** vì "không còn marker". Sai: không còn marker không có nghĩa là không còn chỗ mơ hồ. Clarify sau đó hỏi thêm 3 câu thật.
+- **AI tự thêm yêu cầu, có khai, nhưng vẫn là thêm** (lần 2 trở lên): ID trùng là lỗi, test `skip` không tính, Status thiếu là lỗi… Cần đọc kỹ phần Assumptions và từng phương án, không chỉ đọc tiêu đề.
+- **AI để lọt chỗ nó không tự nhận ra:** SC không đo được ("người review hiểu trong 1 phút"), SC nằm ngoài phạm vi (gắn vào CI), trích sai nguồn của luật.
+- **Giả định bị thực tế bác bỏ:** chọn "bỏ qua khoảng trắng" vì nghĩ Prettier chỉ đổi khoảng trắng. AI chạy thử `pnpm format` và thấy sai.
+- **Analyze lần 1: 3 CRITICAL đều là test pass sẵn trên stub** (chỉ kiểm "không có gì"). Đây là **lần thứ ba** gặp lỗi "assertion trên tập rỗng" (TripDesk, Module 1, giờ) → Growth rule → luật 2 trong `CLAUDE.md`. Analyze lần 2 bắt được ngay các task vi phạm luật mới.
+- **Analyze lặp lại thì `tasks.md` cứ phình:** task bắt đầu chứa chi tiết của code test (thứ tự lỗi, thứ tự trường JSON). Analyze luôn tìm được thêm thứ để góp ý.
+- **Spec-first quá tay cho công cụ nội bộ:** spec 134 dòng + khoảng 370 dòng plan/research/contract + 39 task cho khoảng 3 file nguồn. Theo bảng tiêu chí của chính mình, `spec-diff` nghiêng về code-first; chỉ output JSON (có chương trình khác đọc) là cần contract trước. Lý do thật để chạy đủ vòng là để học.
+- **Quyết định ở Module 1 trả giá ở Module 3:** bỏ `typescript-eslint` → parser của Babel → 2 rule báo sai trên file TypeScript đầu tiên có khai báo kiểu. Bộ test guardrail ở Module 1 không bắt được vì chỉ lint code không có kiểu: test guardrail cần cả code hợp lệ giống code thật.
+- **Giới hạn trong prompt có tác dụng:** AI dừng lại xin phép khi phải sửa lint rule, và không tự suy rộng (*"your approval covered only no-undef"*). AI cũng kiểm tương thích `typescript-eslint` trước khi cài, kể cả các bản canary/rc.
+
+- **Kịch bản tay số 8 (so với `main`) không chạy được thật:** spec chưa có trên `main`, nên `git show` không lấy được bản cũ và tool báo `missing-version`, exit 2. Đây đúng là trường hợp "spec mới" mà clarify đã để bên gọi tự bỏ qua; việc tách exit code "lỗi input" (2) khỏi "vi phạm luật" (1) giúp phân biệt ngay đây là lỗi cấu hình của bên gọi, không phải lỗi của spec. Bước CI sau này phải kiểm file có tồn tại trên `main` trước khi gọi tool.
+- **AI báo rõ phần chưa kiểm:** kịch bản 8, và việc chưa chạy Prettier trên code. Giả định của nó (vẫn báo Version của file đọc được khi có lỗi input, so output không phải JSON dưới dạng chuỗi…) đều nằm trong phạm vi contract.
+
+### Soundbite phỏng vấn
+> **Q9:** Tôi từng chạy đủ vòng spec-first cho một CLI nội bộ so hai file spec: hơn 500 dòng tài liệu và 39 task cho khoảng 3 file nguồn. Theo bảng tiêu chí của tôi (ai dùng, sai thì mất gì, bao nhiêu thứ phụ thuộc, dễ sửa không), đó là việc nên code-first; phần duy nhất cần cố định trước là định dạng JSON vì một bước AI khác sẽ đọc nó. Giờ tôi chọn mức quy trình theo rủi ro.
+
+> **Q6/Q13:** Khi một guardrail báo sai, tôi không vá bừa. Tôi tìm nguyên nhân gốc (parser của ESLint không hiểu kiểu TypeScript), kiểm tương thích trước khi đổi công cụ, và khi không đổi được thì chuyển việc kiểm sang `tsc`, làm test-first. Không lớp kiểm nào bị mất. Lỗi "test pass trên tập rỗng" gặp lần thứ ba thì tôi biến thành luật, và công cụ kiểm nhất quán áp luật đó ngay lần sau.
+
+---
+
 ## Nợ
 
 - **M0:** chưa tự liệt kê 5 rủi ro kỹ thuật và chưa tự lập luận cách tách brief thành feature (đã xem bản tham chiếu của mentor). Trả lại trước Module 14.
-- **M1:** ghi lý do bỏ `no-explicit-any` (mục *Quyết định* ở trên).
 - **M1:** làm lại kiểm mutation trên **code được test** (đổi giới hạn trong `base.js` 60 → 61, 400 → 401, thấy test "rejects" đỏ rồi khôi phục). Lần trước mới đổi input của test.
 - **M2:** điền số PR A/B/C và kết quả bước 7 (PR A có label) vào `docs/sdd/ci.md` và entry Module 2.
 - **M2:** kiểm push protection trong Settings → Code security; cân nhắc gitleaks pre-commit hook.
+- **M3:** thêm `specs/` vào `.prettierignore` (PR hạ tầng riêng).
+- **M3:** cân nhắc thêm vào `docs/sdd/spec-first-vs-code-first.md` tiêu chí "output có chương trình khác đọc → chỉ cần contract cho output trước".
