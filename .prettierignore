@@ -1,0 +1,3 @@
+# Specs are versioned; a formatter rewrite (e.g. *x* -> _x_) would count as a content change
+# and need a Version bump (CLAUDE.md Rule 1, spec 001-spec-diff FR-005).
+specs/
