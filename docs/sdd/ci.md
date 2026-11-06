@@ -8,13 +8,14 @@ CI is built code-first: it is tooling with no user-facing behavior, exempt from 
 
 | Job | What it blocks | Principle | Proof (PR made to fail on purpose, closed unmerged) |
 |---|---|---|---|
-| `verify`: `pnpm turbo run lint check-types test --continue` | Lint violations (`max-lines-per-function` 60, `max-lines` 400), type errors, failing tests | III, AI-code contract | PR #`<C>`: a 61-line function → `max-lines-per-function` error, only problem reported, merge `BLOCKED` |
-| `secrets`: gitleaks on every commit of the PR (`fetch-depth: 0`) | Secrets committed to git, **including ones deleted in a later commit** (still in history) | V | PR #`<B>`: fake GitHub PAT added, then deleted → `github-pat` found in the adding commit, merge `BLOCKED` |
-| `guard-deps`: `pnpm-lock.yaml` changed and no `deps-approved` label → fail | Dependencies added, upgraded or removed without a recorded reason | IV | PR #`<A>`: `picocolors` added as a direct devDependency (already a transitive one; lockfile changed 3 lines) → fail, merge `BLOCKED`; with the label → `<kết quả bước 7>` |
+| `verify`: `pnpm turbo run lint check-types test --continue` | Lint violations (`max-lines-per-function` 60, `max-lines` 400), type errors, failing tests | III, AI-code contract | PR #`<5>`: a 61-line function → `max-lines-per-function` error, only problem reported, merge `BLOCKED` |
+| `secrets`: gitleaks on every commit of the PR (`fetch-depth: 0`) | Secrets committed to git, **including ones deleted in a later commit** (still in history) | V | PR #`<3>`: fake GitHub PAT added, then deleted → `github-pat` found in the adding commit, merge `BLOCKED` |
+| `guard-deps`: `pnpm-lock.yaml` changed and no `deps-approved` label → fail | Dependencies added, upgraded or removed without a recorded reason | IV | PR #`<4>`: `picocolors` added as a direct devDependency (already a transitive one; lockfile changed 3 lines) → fail, merge `BLOCKED`; with the label → `<kết quả bước 7>` |
+| `spec-diff`: for each `specs/*/spec.md` changed in the PR and present on the base, compare base vs PR with `packages/spec-diff` (new or deleted specs are skipped) | A spec whose content changed without a Version bump; an unreadable spec, a missing or malformed Version, duplicate FR/SC IDs | I, CLAUDE.md Rule 1 | PR #`11`: one FR edited in `specs/001-spec-diff/spec.md`, Version left at 1.0.1 → `version-not-bumped`, exit 1, merge `BLOCKED` |
 
 `pnpm install --frozen-lockfile` in `verify` also fails when `package.json` changes without the lockfile, so `guard-deps` cannot be bypassed by skipping the lockfile.
 
-**Enforcement:** a ruleset on `main` requires a PR and all three checks to pass. `guard-deps` is skipped on push to `main` (job-level `if:`); a skipped job counts as passing, so it never leaves a PR waiting. No approval is required yet: the author cannot approve their own PR in a solo repo. Turn on required Code Owner review when AI opens PRs (the author is then a bot, so the rule can be met).
+**Enforcement:** a ruleset on `main` requires a PR and all four checks to pass. `guard-deps` and `spec-diff` are skipped on push to `main` (job-level `if:`); a skipped job counts as passing, so it never leaves a PR waiting. No approval is required yet: the author cannot approve their own PR in a solo repo. Turn on required Code Owner review when AI opens PRs (the author is then a bot, so the rule can be met).
 
 ## Design decisions
 

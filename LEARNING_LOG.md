@@ -191,6 +191,26 @@ Mỗi Module một entry: **Đã làm gì · Quyết định và vì sao · Vấ
 
 ---
 
+## Phần 2 (lộ trình rút gọn) — `spec-diff` trong CI và bước AI `spec-impact` (đang làm, 2026-11-06)
+
+### Đã làm gì
+- **2a:** thêm job `spec-diff` vào `.github/workflows/pr.yml`: với mỗi `specs/*/spec.md` bị sửa trong PR, lấy bản trên base bằng `git show`, chạy `spec-diff`; spec nào exit khác 0 thì job đỏ.
+  - PR #`<C>` (`ci/spec-diff-gate`, không sửa spec): job in "No spec changed." và xanh.
+  - PR phá cố ý #`<D>` (`ci/spec-diff-gate-failure`): sửa một FR trong spec 001, giữ Version 1.0.1 → job đỏ, `version-not-bumped`. Đóng, không merge.
+  - `docs/sdd/ci.md`: thêm dòng `spec-diff` vào bảng Gates; ruleset giờ yêu cầu 4 check.
+
+### Quyết định và vì sao
+- **Hai lớp:** gate tất định (2a, chặn merge) trước; bước AI (2b, chỉ comment) sau và dùng output của 2a.
+- **2a là một job trong `pr.yml`**, không phải workflow riêng có `paths:` (bài học Module 2: check bắt buộc của workflow không chạy sẽ chờ mãi). PR không sửa spec thì job in "No spec changed." và xanh.
+- **Chỉ chạy trên PR** (`if:` cấp job), vì cần base của PR; job skipped trên push vào `main` được tính là đạt.
+- **Spec mới (chưa có trên base) và spec bị xoá: bỏ qua**, đúng quyết định Q3 ở clarify (bên gọi tự lo trường hợp không có bản cũ).
+- **Script viết thẳng trong YAML** (khoảng 25 dòng bash), không tách file: máy dùng PowerShell nên không chạy thử script bash trên máy được.
+- **Không cài dependency:** `spec-diff` chỉ dùng module có sẵn của Node và chạy thẳng TypeScript bằng Node 24, nên job chỉ cần checkout và setup-node.
+- **Chưa lưu output JSON thành artifact:** để dành tới khi làm 2b (chỉ thêm khi cần).
+- Dữ liệu PR đi qua `env`, action ghim SHA như các job khác.
+
+---
+
 ## Nợ
 
 - **M0:** chưa tự liệt kê 5 rủi ro kỹ thuật và chưa tự lập luận cách tách brief thành feature (đã xem bản tham chiếu của mentor). Trả lại trước Module 14.
@@ -199,3 +219,4 @@ Mỗi Module một entry: **Đã làm gì · Quyết định và vì sao · Vấ
 - **M2:** kiểm push protection trong Settings → Code security; cân nhắc gitleaks pre-commit hook.
 - **M3:** thêm `specs/` vào `.prettierignore` (PR hạ tầng riêng).
 - **M3:** cân nhắc thêm vào `docs/sdd/spec-first-vs-code-first.md` tiêu chí "output có chương trình khác đọc → chỉ cần contract cho output trước".
+- **Phần 2a:** chứng minh job `spec-diff` bằng một PR phá cố ý; thêm job vào required checks của ruleset; thêm một dòng vào bảng Gates trong `docs/sdd/ci.md`.
