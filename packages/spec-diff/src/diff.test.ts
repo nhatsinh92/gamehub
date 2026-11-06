@@ -188,6 +188,15 @@ test("[001:FR-004] lists exactly the changed IDs in two 200-entry specs", () => 
   expect(diffBig(p)).toEqual(p.expected);
 });
 
+test("[001:SC-004] diffs two 200-entry specs in under 1 second", () => {
+  const p = bigPair();
+  diffBig(p);
+  const start = performance.now();
+  const r = diffBig(p);
+  const elapsed = performance.now() - start;
+  expect({ r, fast: elapsed < 1000 }).toEqual({ r: p.expected, fast: true });
+});
+
 test("[001:FR-005] ignores re-wrapping and spacing changes", () => {
   const r = run(
     { fr: { "FR-001": "alpha beta gamma delta" } },
