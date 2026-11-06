@@ -135,6 +135,7 @@ Mỗi Module một entry: **Đã làm gì · Quyết định và vì sao · Vấ
   - tasks: 39 task, 6 phase; analyze 2 lượt (lượt 1: 3 CRITICAL, lượt 2: 0 CRITICAL).
   - implement lần chạy 1 (Phase 1–3, T001–T019): **xong**. 5 commit `test(red)` (T010–T013) đứng trước 4 commit `feat(green)` (T015–T018); commit T014 ghi "31/31 test fail on behavior"; commit red chỉ chứa test (ví dụ T010: chỉ `diff.parse.test.ts` + `tasks.md`). Thêm 2 cặp red/green sửa `eslint-config` chen giữa. Code: khoảng 190 dòng nguồn (`diff.ts`, `format.ts`, `cli.ts`) và 615 dòng test.
   - implement lần chạy 2 (Phase 4–6, T020–T038): **xong**, 19 commit, 39/39 task `[X]`. US2: 14 test đỏ (31 test US1 vẫn xanh) trước 4 commit green; US3: 8 test đỏ trước 2 commit green. Gate toàn repo: 6/6 task turbo, 53/53 test của spec-diff, 6/6 của eslint-config. 24 case `diffSpecs` (SC-001 cần ≥ 10), FR-001..FR-012 đều có tag.
+  - **PR #8 đã merge** vào `main`, spec 1.0.1 Implemented. Bước tự kiểm bằng tool (so spec với commit approve `3121ec4`) bị bỏ qua trước khi merge, làm bù sau merge, giao cho AI với prompt chỉ đọc (không sửa, không commit; sai kỳ vọng thì dừng và phân loại lỗi tool hay lỗi môi trường): **3/3 PASS**. (1) 1.0.0 → 1.0.1, không FR/SC nào đổi, exit 0. (2) bản giả chỉ đổi Status, giữ 1.0.0 → `version-not-bumped`, exit 1. (3) như (2) với `--json` → JSON hợp lệ, `result: rule-violation`, exit 1. AI kiểm 3 byte đầu của file để chắc không có BOM.
 - `CLAUDE.md` thêm **luật 2**: test so toàn bộ giá trị kỳ vọng; test pass trên stub hoặc kết quả rỗng không chứng minh gì.
 
 ### Quyết định và vì sao
@@ -179,6 +180,9 @@ Mỗi Module một entry: **Đã làm gì · Quyết định và vì sao · Vấ
 
 - **Kịch bản tay số 8 (so với `main`) không chạy được thật:** spec chưa có trên `main`, nên `git show` không lấy được bản cũ và tool báo `missing-version`, exit 2. Đây đúng là trường hợp "spec mới" mà clarify đã để bên gọi tự bỏ qua; việc tách exit code "lỗi input" (2) khỏi "vi phạm luật" (1) giúp phân biệt ngay đây là lỗi cấu hình của bên gọi, không phải lỗi của spec. Bước CI sau này phải kiểm file có tồn tại trên `main` trước khi gọi tool.
 - **AI báo rõ phần chưa kiểm:** kịch bản 8, và việc chưa chạy Prettier trên code. Giả định của nó (vẫn báo Version của file đọc được khi có lỗi input, so output không phải JSON dưới dạng chuỗi…) đều nằm trong phạm vi contract.
+
+- **Windows PowerShell 5.1 làm hỏng file khi lấy bản cũ:** `>` ghi UTF-16, `Out-File -Encoding utf8` thêm BOM, `utf8NoBOM` chỉ có từ PowerShell 7. Dùng `cmd /c "git show ... > file"` để giữ nguyên từng byte. Tool chưa xử lý BOM (spec không nói tới); BOM ở đầu một file có thể làm tool báo nhầm "content changed". Gợi ý cho bản sau.
+- **Checklist trong PR template không chặn được việc bỏ qua bước kiểm tay:** PR #8 merge trước khi chạy tool trên chính spec của nó. Bước nào không được bỏ qua thì nên thành job CI (ví dụ chạy `spec-diff` trên các spec có thay đổi).
 
 ### Soundbite phỏng vấn
 > **Q9:** Tôi từng chạy đủ vòng spec-first cho một CLI nội bộ so hai file spec: hơn 500 dòng tài liệu và 39 task cho khoảng 3 file nguồn. Theo bảng tiêu chí của tôi (ai dùng, sai thì mất gì, bao nhiêu thứ phụ thuộc, dễ sửa không), đó là việc nên code-first; phần duy nhất cần cố định trước là định dạng JSON vì một bước AI khác sẽ đọc nó. Giờ tôi chọn mức quy trình theo rủi ro.
