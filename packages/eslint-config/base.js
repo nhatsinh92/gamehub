@@ -33,6 +33,8 @@ export const config = [
   {
     // flat config lints only .js/.mjs/.cjs unless another extension is listed
     files: ["**/*.ts", "**/*.tsx"],
+    // babel's scope analysis doesn't see TS type names; tsc (check-types) reports undefined names
+    rules: { "no-undef": "off" },
   },
   {
     ignores: ["dist/**"],
