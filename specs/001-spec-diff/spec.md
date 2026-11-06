@@ -95,7 +95,7 @@ A later CI step (for example an AI reviewer) asks for the machine-readable form 
 - **FR-008**: In machine-readable mode, standard output MUST contain only the machine-readable document.
 - **FR-009**: The check MUST end with a passing result when no error was found, whether or not any requirement changed.
 - **FR-010**: The check MUST NOT judge whether the bump level (MAJOR/MINOR/PATCH) or direction (including a lower new version) fits the change, and MUST NOT evaluate the content of the spec.
-- **FR-011**: The check MUST NOT create, modify, or delete any file.
+- **FR-011**: The check MUST NOT create, modify, or delete any file. Update without bump version
 
 ### Key Entities
 
