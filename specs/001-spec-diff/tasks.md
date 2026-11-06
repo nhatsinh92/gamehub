@@ -40,7 +40,7 @@
 - [X] T006 [P] Create `packages/spec-diff/src/format.ts` with stubs `export function formatText(r: DiffResult): string` and `export function formatJson(r: DiffResult): string`, both returning `""`
 - [X] T007 [P] Create `packages/spec-diff/src/cli.ts`: first line `#!/usr/bin/env node`, a stub that writes nothing and sets `process.exitCode = 2`
 - [X] T008 [P] Create `packages/spec-diff/src/fixtures.ts`, a test helper: `export function makeSpec(opts: { version?: string | null; fr?: Record<string, string>; sc?: Record<string, string>; extra?: string }): string`. Keys of `fr`/`sc` are full IDs (`{ "FR-001": "text" }`), written in insertion order. A `Record` can't hold a duplicate ID, so tests that need one (T020, T022) add the second bullet through `extra`. It builds a minimal spec in the template's shape: a title; a `**Version**: x.y.z` line (left out when `version` is `null`; default `1.0.0`); `### Functional Requirements` followed by `- **FR-NNN**: text` bullets; `### Measurable Outcomes` followed by `- **SC-NNN**: text` bullets; and `extra` appended at the end. It contains no real names or secrets (constitution V)
-- [ ] T009 Run `pnpm --filter @repo/spec-diff lint` and `pnpm --filter @repo/spec-diff check-types`; both pass
+- [X] T009 Run `pnpm --filter @repo/spec-diff lint` and `pnpm --filter @repo/spec-diff check-types`; both pass
 
 **Checkpoint**: stubs compile; story work can start.
 
