@@ -108,7 +108,7 @@
 
 - [X] T029 [P] [US3] In `packages/spec-diff/src/format.test.ts`, write `[001:FR-007]` tests for `formatJson` against contracts/cli.md › Machine-readable output: `JSON.parse(out)` equals (`toEqual`) the full expected object `{ schemaVersion: 1, result, files, versions, contentChanged, fr, sc, errors }` written literally in the test (key order has no meaning, contracts/cli.md); a separate assertion checks that `out` ends with exactly one `\n` (ends with `"\n"`, not with `"\n\n"`). Also a same-content test: for a pass, a rule-violation and an input-error result, every version, ID and error message in the JSON also appears in `formatText` output (SC-003)
 - [X] T030 [P] [US3] In `packages/spec-diff/src/cli.test.ts`, write `[001:FR-008]`: with `--json` first, last or between the paths, `JSON.parse(stdout)` equals (`toEqual`) the full expected object written literally in the test, and the exit code matches `result`; any extra text on stdout makes `JSON.parse` throw, which fails the test; `--json` with one path → stdout empty, usage on stderr, exit 2; an unknown flag with one path, `--yaml <path>` → stdout empty, usage on stderr, exit 2 (two arguments, so the US1 code reads `--yaml` as a path and prints a report; that is what makes the test fail before T033)
-- [ ] T031 [US3] Run `pnpm --filter @repo/spec-diff test`. Confirm the T029–T030 tests fail on an assertion and all earlier tests still pass
+- [X] T031 [US3] Run `pnpm --filter @repo/spec-diff test`. Confirm the T029–T030 tests fail on an assertion and all earlier tests still pass
 
 ### Implementation for User Story 3
 
