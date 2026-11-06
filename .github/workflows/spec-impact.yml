@@ -1,0 +1,73 @@
+# AI step: comment on a PR which code and tests a spec change may affect.
+# Not a gate: it never blocks a merge, it only posts one comment.
+# Runs only when a person adds the `ai-review` label, and never for fork PRs.
+# Prompt: prompts/spec-impact@v1.md. See docs/sdd/ci.md.
+name: spec-impact
+
+on:
+  pull_request:
+    types: [labeled]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: spec-impact-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  spec-impact:
+    if: >-
+      github.event.label.name == 'ai-review' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pull-requests: write # post the comment, nothing else
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+
+      - name: Run spec-diff on every changed spec (JSON)
+        id: diff
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          out=.spec-impact
+          mkdir -p "$out"
+          count=0
+          for path in $(git diff --name-only "$BASE_SHA" HEAD -- 'specs/*/spec.md'); do
+            [ -f "$path" ] || continue
+            git cat-file -e "$BASE_SHA:$path" 2>/dev/null || continue
+            name=$(basename "$(dirname "$path")")
+            git show "$BASE_SHA:$path" > "$out/$name.old.md"
+            # Exit 1/2 is fine here: the pr.yml gate already reports it.
+            node packages/spec-diff/src/cli.ts --json "$out/$name.old.md" "$path" > "$out/$name.json" || true
+            count=$((count + 1))
+          done
+          echo "count=$count" >> "$GITHUB_OUTPUT"
+          echo "Changed specs with a base version: $count"
+
+      - name: Comment spec impact
+        if: steps.diff.outputs.count != '0'
+        uses: anthropics/claude-code-action@c0949c50a78c1ec8ce2647db36629b870e715d0c # v1.0.268
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+
+            Follow the instructions in prompts/spec-impact@v1.md exactly.
+            Inputs: .spec-impact/<feature>.json (spec-diff output) and
+            .spec-impact/<feature>.old.md (the spec on the PR base); the new spec
+            is specs/<feature>/spec.md in the checked-out branch.
+            Post exactly one comment with `gh pr comment`.
+          claude_args: |
+            --max-turns 10
+            --allowedTools "Read,Glob,Grep,Bash(gh pr comment:*)"
