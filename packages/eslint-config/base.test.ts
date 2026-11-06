@@ -46,4 +46,15 @@ describe("TypeScript files", () => {
     ].join("\n");
     expect(await ruleIds(code)).toEqual([]);
   });
+
+  test("accepts a type imported and used only in annotations", async () => {
+    const code = [
+      'import type { Item } from "./item.ts";',
+      "export function name(item: Item): string {",
+      "  return String(item);",
+      "}",
+      "",
+    ].join("\n");
+    expect(await ruleIds(code)).toEqual([]);
+  });
 });
