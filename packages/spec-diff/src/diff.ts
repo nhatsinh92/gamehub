@@ -81,14 +81,49 @@ export function parseSpec(path: string, text: string): ParsedSpec {
   return { version, versionLine, entries, errors: [], body };
 }
 
-export function diffSpecs(oldSpec: SpecInput, newSpec: SpecInput): DiffResult {
+// Sorted by the number as an integer (FR-002 before FR-010); one list has one prefix.
+const byNumber = (a: string, b: string) =>
+  Number(a.slice(3)) - Number(b.slice(3));
+
+function idChanges(
+  a: Map<string, string>,
+  b: Map<string, string>,
+  prefix: "FR" | "SC",
+): IdChanges {
+  const ids = (m: Map<string, string>) =>
+    [...m.keys()].filter((id) => id.startsWith(`${prefix}-`)).sort(byNumber);
   return {
-    result: "input-error",
-    files: { old: oldSpec.path, new: newSpec.path },
-    versions: { old: null, new: null },
-    contentChanged: null,
-    fr: { added: [], removed: [], changed: [] },
-    sc: { added: [], removed: [], changed: [] },
+    added: ids(b).filter((id) => !a.has(id)),
+    removed: ids(a).filter((id) => !b.has(id)),
+    changed: ids(a).filter((id) => b.has(id) && a.get(id) !== b.get(id)),
+  };
+}
+
+export function diffSpecs(oldSpec: SpecInput, newSpec: SpecInput): DiffResult {
+  const files = { old: oldSpec.path, new: newSpec.path };
+  const empty = () => ({ added: [], removed: [], changed: [] });
+  if (!("text" in oldSpec) || !("text" in newSpec)) {
+    // shortcut: no unreadable-file error yet; US2 (T025) adds it
+    return {
+      result: "input-error",
+      files,
+      versions: { old: null, new: null },
+      contentChanged: null,
+      fr: empty(),
+      sc: empty(),
+      errors: [],
+    };
+  }
+  const a = parseSpec(oldSpec.path, oldSpec.text);
+  const b = parseSpec(newSpec.path, newSpec.text);
+  // FR-010: version order and bump level are never compared.
+  return {
+    result: "pass",
+    files,
+    versions: { old: a.version, new: b.version },
+    contentChanged: a.body !== b.body,
+    fr: idChanges(a.entries, b.entries, "FR"),
+    sc: idChanges(a.entries, b.entries, "SC"),
     errors: [],
   };
 }
