@@ -154,6 +154,7 @@ Mỗi Module một entry: **Đã làm gì · Quyết định và vì sao · Vấ
   - chạy thẳng TypeScript bằng Node 24, không build;
   - exit code 0/1/2, lỗi bất ngờ cũng thoát mã 2.
 - **Thêm `specs/` vào `.prettierignore`** (thay đổi hạ tầng riêng): Prettier không chỉ đổi khoảng trắng mà còn đổi `*` thành `-` và `*(x)*` thành `_(x)_`.
+- **Status đổi thành Implemented ngay trong PR của code** (bump PATCH 1.0.1), không đợi merge xong mới mở PR khác: khi PR merge, `main` có code và spec khớp nhau ngay, không có khoảng thời gian spec ghi Approved trong khi code đã có; bớt một PR.
 - **Chạy implement 2 lần thay vì 6** (gộp Phase 1–3, rồi 4–6). Vẫn giữ US3 (JSON).
 - **Điểm dừng cho analyze:** tối đa 2 lượt; sửa CRITICAL và lỗi chặn việc implement; phần còn lại để review trên code thật.
 - **Lint của TypeScript** (parser của Babel không hiểu kiểu):
