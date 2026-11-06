@@ -95,3 +95,75 @@ test("[001:FR-011] leaves both input files and the directory unchanged", () => {
     after: before,
   });
 });
+
+function writeFiles(oldText: string, newText: string) {
+  const dir = mkdtempSync(join(tmpdir(), "spec-diff-"));
+  dirs.push(dir);
+  const oldPath = join(dir, "old.md");
+  const newPath = join(dir, "new.md");
+  writeFileSync(oldPath, oldText);
+  writeFileSync(newPath, newText);
+  return { dir, oldPath, newPath };
+}
+
+const fr3 = { "FR-001": "A.", "FR-002": "B.", "FR-003": "C." };
+
+test("[001:FR-005] exits 1 with the rule-violation report for a change without a bump", () => {
+  const p = writeFiles(
+    makeSpec({ fr: fr3 }),
+    makeSpec({ fr: { ...fr3, "FR-002": "B, reworded." } }),
+  );
+  expect(run(p.oldPath, p.newPath)).toEqual({
+    status: 1,
+    stdout: [
+      `${p.oldPath} -> ${p.newPath}`,
+      "Version: 1.0.0 -> 1.0.0",
+      "Content changed: yes",
+      "FR added: none",
+      "FR removed: none",
+      "FR changed: FR-002",
+      "SC added: none",
+      "SC removed: none",
+      "SC changed: none",
+      `error: ${p.newPath}: content changed but Version is still 1.0.0`,
+      "Result: rule-violation",
+      "",
+    ].join("\n"),
+    stderr: "",
+  });
+});
+
+test("[001:FR-006] exits 2 with the input-error report for a missing old path", () => {
+  const p = writeFiles(makeSpec({ fr: fr3 }), makeSpec({ fr: fr3 }));
+  const missing = join(p.dir, "missing.md");
+  expect(run(missing, p.newPath)).toEqual({
+    status: 2,
+    stdout: [
+      `${missing} -> ${p.newPath}`,
+      "Version: ? -> 1.0.0",
+      `error: ${missing}: cannot read file (ENOENT)`,
+      "Result: input-error",
+      "",
+    ].join("\n"),
+    stderr: "",
+  });
+});
+
+test("[001:FR-012] exits 2 and reports both a missing Version and a duplicate ID", () => {
+  const p = writeFiles(
+    makeSpec({ fr: fr3 }),
+    makeSpec({ version: null, fr: fr3, extra: "- **FR-003**: C again." }),
+  );
+  expect(run(p.oldPath, p.newPath)).toEqual({
+    status: 2,
+    stdout: [
+      `${p.oldPath} -> ${p.newPath}`,
+      "Version: 1.0.0 -> ?",
+      `error: ${p.newPath}: no "**Version**: x.y.z" line`,
+      `error: ${p.newPath}: FR-003 is defined 2 times`,
+      "Result: input-error",
+      "",
+    ].join("\n"),
+    stderr: "",
+  });
+});
