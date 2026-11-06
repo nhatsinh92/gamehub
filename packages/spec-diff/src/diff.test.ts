@@ -246,16 +246,24 @@ test("[001:FR-009] passes on a change with a version bump", () => {
   );
 });
 
-test("[001:FR-010] accepts a lower new version without error", () => {
+test("[001:FR-010] a lower new version with a content change is a rule violation", () => {
   const r = run(
     { version: "1.2.0", fr: fr3 },
     { version: "1.1.0", fr: { ...fr3, "FR-001": "A, reworded." } },
   );
-  expect(r).toEqual(
-    pass({
+  expect(r).toEqual({
+    ...pass({
       versions: ["1.2.0", "1.1.0"],
       contentChanged: true,
       fr: { changed: ["FR-001"] },
     }),
-  );
+    result: "rule-violation",
+    errors: [
+      {
+        code: "version-decreased",
+        file: "new.md",
+        message: "new.md: Version decreased from 1.2.0 to 1.1.0",
+      },
+    ],
+  });
 });

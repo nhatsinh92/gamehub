@@ -64,6 +64,40 @@ test("[001:FR-005] a change outside FR and SC without a bump is a rule violation
   });
 });
 
+function decreased(from: string, to: string): DiffResult {
+  return {
+    result: "rule-violation",
+    files,
+    versions: { old: from, new: to },
+    contentChanged: false,
+    fr: none,
+    sc: none,
+    errors: [
+      {
+        code: "version-decreased",
+        file: "new.md",
+        message: `new.md: Version decreased from ${from} to ${to}`,
+      },
+    ],
+  };
+}
+
+test("[001:FR-010] a lower new version is a rule violation (US2 scenario 4)", () => {
+  const r = diffSpecs(
+    oldIn({ version: "1.2.0", fr: fr3 }),
+    newIn({ version: "1.1.0", fr: fr3 }),
+  );
+  expect(r).toEqual(decreased("1.2.0", "1.1.0"));
+});
+
+test("[001:FR-010] compares versions as semver integers, not strings", () => {
+  const r = diffSpecs(
+    oldIn({ version: "1.10.0", fr: fr3 }),
+    newIn({ version: "1.9.0", fr: fr3 }),
+  );
+  expect(r).toEqual(decreased("1.10.0", "1.9.0"));
+});
+
 test("[001:FR-006] an unreadable file is an input error naming the path", () => {
   const r = diffSpecs(
     { path: "old.md", readError: "ENOENT" },

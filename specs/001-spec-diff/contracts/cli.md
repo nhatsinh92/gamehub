@@ -1,6 +1,6 @@
 # Contract: `spec-diff` CLI
 
-**Feature**: [../spec.md](../spec.md) (v1.0.0) | Decisions: [../research.md](../research.md)
+**Feature**: [../spec.md](../spec.md) (v2.0.0) | Decisions: [../research.md](../research.md)
 
 ## Invocation
 
@@ -18,7 +18,7 @@ node packages/spec-diff/src/cli.ts [--json] <old-spec-path> <new-spec-path>
 | Code | `result` | When |
 |---|---|---|
 | 0 | `pass` | No error, whether or not anything changed (FR-009) |
-| 1 | `rule-violation` | Content changed but the Version did not (FR-005) |
+| 1 | `rule-violation` | Content changed but the Version did not (FR-005), or the new Version is lower than the old (FR-010) |
 | 2 | `input-error` | A file cannot be read, has no valid Version, or has a duplicate ID (FR-006); bad usage; or an internal error. Takes precedence over 1 |
 
 ## Error codes
@@ -30,8 +30,9 @@ node packages/spec-diff/src/cli.ts [--json] <old-spec-path> <new-spec-path>
 | `invalid-version` | the path | `new.md: Version "1.0" is not in x.y.z form` |
 | `duplicate-id` | the path | `new.md: FR-003 is defined 2 times` (one error per duplicated ID) |
 | `version-not-bumped` | the new path | `new.md: content changed but Version is still 1.0.0` |
+| `version-decreased` | the new path | `new.md: Version decreased from 1.2.0 to 1.1.0` |
 
-All input errors from both files are reported in one run (FR-012). `version-not-bumped` is reported only when there is no input error.
+All input errors from both files are reported in one run (FR-012). `version-not-bumped` and `version-decreased` are reported only when there is no input error. They never occur together (equal versions vs a lower new version). `version-decreased` is reported whether or not the content changed; versions are compared as semver, part by part as integers.
 
 ## Machine-readable output (`--json`)
 
@@ -58,7 +59,7 @@ Stdout holds exactly one JSON object followed by a newline, and nothing else (FR
 | `versions.old`, `versions.new` | string \| `null` | `null` when the file has no valid Version or cannot be read |
 | `contentChanged` | boolean \| `null` | `null` on `input-error` (comparison not run) |
 | `fr`, `sc` | `{ added, removed, changed }`, each `string[]` | IDs only, sorted (FR-004); all empty on `input-error` |
-| `errors` | `{ code, file, message }[]` | Order: old-file errors, then new-file errors (within a file: `unreadable-file` or the Version error first, then `duplicate-id` errors by ID), then `version-not-bumped` |
+| `errors` | `{ code, file, message }[]` | Order: old-file errors, then new-file errors (within a file: `unreadable-file` or the Version error first, then `duplicate-id` errors by ID), then `version-not-bumped` or `version-decreased` |
 
 Key order in the object has no meaning; consumers parse the JSON. The order of items inside arrays is part of the contract.
 

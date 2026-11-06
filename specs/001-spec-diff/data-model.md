@@ -1,6 +1,6 @@
 # Data Model: Spec Diff Check
 
-**Feature**: [spec.md](spec.md) (v1.0.0) | Parsing rules: [research.md R1](research.md#r1-finding-the-version-line-and-frsc-entries) | Output: [contracts/cli.md](contracts/cli.md)
+**Feature**: [spec.md](spec.md) (v2.0.0) | Parsing rules: [research.md R1](research.md#r1-finding-the-version-line-and-frsc-entries) | Output: [contracts/cli.md](contracts/cli.md)
 
 Types live in `packages/spec-diff/src/`. Plain object types and string unions only (no `enum`; Node type stripping needs erasable syntax, research R3).
 
@@ -35,7 +35,7 @@ Validation:
 
 | Field | Type |
 |---|---|
-| `code` | `"unreadable-file" \| "missing-version" \| "invalid-version" \| "duplicate-id" \| "version-not-bumped"` |
+| `code` | `"unreadable-file" \| "missing-version" \| "invalid-version" \| "duplicate-id" \| "version-not-bumped" \| "version-decreased"` |
 | `file` | string (path) |
 | `message` | string; starts with the path (FR-006) |
 
@@ -66,9 +66,10 @@ The single value the core returns; both output forms render it (FR-007).
 read errors + parse errors of both files (all collected, FR-012)
   any?  -> result = input-error, contentChanged = null, lists empty      (exit 2)
   none  -> compare: contentChanged = old.body != new.body; build fr/sc lists
-           contentChanged and versions equal -> add version-not-bumped,
-                                                result = rule-violation  (exit 1)
-           otherwise                         -> result = pass           (exit 0)
+           new version < old version (semver)  -> add version-decreased     (FR-010)
+           contentChanged and versions equal   -> add version-not-bumped    (FR-005)
+           any rule error -> result = rule-violation                        (exit 1)
+           otherwise      -> result = pass                                  (exit 0)
 ```
 
-Version direction and bump level are never compared (FR-010).
+Bump level (MAJOR/MINOR/PATCH) is never judged (FR-010).

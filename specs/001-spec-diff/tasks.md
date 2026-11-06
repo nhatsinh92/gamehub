@@ -151,3 +151,16 @@
 4. **Polish**: SC-001 case count, tag coverage, quickstart, full repo gate.
 
 Commit after each green run (T019, T028, T034, T038) so every commit passes lint, types and tests.
+
+---
+
+## Phase 7: Spec 2.0.0: FR-010 redefined (a lower new Version is a rule violation)
+
+**Input**: spec.md 2.0.0 Changelog entry; contracts/cli.md and data-model.md updated for the `version-decreased` code.
+
+- [ ] T039 [US2] In `packages/spec-diff/src/diff.test.ts`, change the test `[001:FR-010] accepts a lower new version without error` into `[001:FR-010] a lower new version with a content change is a rule violation`: 1.2.0 → 1.1.0 with FR-001 reworded gives `result: "rule-violation"`, `fr.changed: ["FR-001"]` and one error `{ code: "version-decreased", file: "new.md", message: "new.md: Version decreased from 1.2.0 to 1.1.0" }` (whole `DiffResult` with `toEqual`)
+- [ ] T040 [P] [US2] In `packages/spec-diff/src/diff.errors.test.ts`, add `[001:FR-010]` for US2 scenario 4: old 1.2.0, new 1.1.0, content otherwise identical gives `result: "rule-violation"`, `contentChanged: false`, empty lists, and the same single `version-decreased` error. Also add a semver-order case: 1.10.0 → 1.9.0 is a decrease (integer parts, not string order)
+- [ ] T041 [US2] Run `pnpm --filter @repo/spec-diff test`; confirm T039 and T040 fail on an assertion and all other tests pass. Commit `test(red): ...`
+- [ ] T042 [US2] In `packages/spec-diff/src/diff.ts`, add `"version-decreased"` to `SpecError["code"]` and, after the input-error check in `diffSpecs`, add the error when the new Version is lower than the old (compared part by part as integers). Make T039–T040 pass
+- [ ] T043 [US2] Run `pnpm --filter @repo/spec-diff lint check-types test`; everything passes. Commit `feat(green): ...`
+- [ ] T044 Set spec.md Status to Implemented, Version 2.0.1, with a Changelog line (CLAUDE.md Rule 1). Run the full repo gate `pnpm turbo run lint check-types test --continue`
