@@ -123,7 +123,7 @@
 ## Phase 6: Polish & Cross-Cutting Concerns
 
 - [X] T035 [P] Re-check SC-001 (counted in T023): at least 10 old/new `diffSpecs` cases in `packages/spec-diff/src/diff*.test.ts`, covering every acceptance scenario and edge case in spec.md. Add no tests here; if a gap is found, stop and report it to the owner, because a test added after the code can't be seen failing on a stub (CLAUDE.md Rule 2)
-- [ ] T036 Check tag coverage: `grep -rhoE "\[001:FR-[0-9]{3}\]" packages/spec-diff/src | sort -u` prints all of FR-001 to FR-012, and every `test(`/`it(` name in `packages/spec-diff/src/*.test.ts` starts with a `[001:` tag
+- [X] T036 Check tag coverage: `grep -rhoE "\[001:FR-[0-9]{3}\]" packages/spec-diff/src | sort -u` prints all of FR-001 to FR-012, and every `test(`/`it(` name in `packages/spec-diff/src/*.test.ts` starts with a `[001:` tag
 - [ ] T037 Run quickstart.md › Manual scenarios 1–8 against the real spec (copies go in a temp directory, not the repo). Check each exit code with `$LASTEXITCODE` (PowerShell) or `echo $?` (bash), and confirm `git status` shows no files created or changed by the tool
 - [ ] T038 Run the full repo gate `pnpm turbo run lint check-types test --continue` (the same command as the CI `verify` job); everything passes
 
