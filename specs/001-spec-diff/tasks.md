@@ -112,7 +112,7 @@
 
 ### Implementation for User Story 3
 
-- [ ] T032 [P] [US3] Implement `formatJson` in `packages/spec-diff/src/format.ts`: `JSON.stringify({ schemaVersion: 1, ...fields from the contract }, null, 2) + "\n"`. Make T029 pass
+- [X] T032 [P] [US3] Implement `formatJson` in `packages/spec-diff/src/format.ts`: `JSON.stringify({ schemaVersion: 1, ...fields from the contract }, null, 2) + "\n"`. Make T029 pass
 - [ ] T033 [US3] In `packages/spec-diff/src/cli.ts`, take `--json` from any position; any other argument starting with `-` is a usage error (exit 2, nothing on stdout); with `--json`, print `formatJson` instead of `formatText`. Make T030 pass
 - [ ] T034 [US3] Run `pnpm --filter @repo/spec-diff lint check-types test`; everything passes
 

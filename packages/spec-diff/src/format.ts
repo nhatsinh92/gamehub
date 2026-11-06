@@ -21,7 +21,7 @@ export function formatText(r: DiffResult): string {
   ].join("\n");
 }
 
+// Shape: contracts/cli.md › Machine-readable output.
 export function formatJson(r: DiffResult): string {
-  void r;
-  return "";
+  return JSON.stringify({ schemaVersion: 1, ...r }, null, 2) + "\n";
 }
