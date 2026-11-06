@@ -42,20 +42,44 @@ const VERSION = /^\*\*Version\*\*:\s*(\S+)\s*$/;
 const ENTRY = /^- \*\*(FR|SC)-(\d+)\*\*:/;
 const FENCE = /^(```|~~~)/;
 const ENTRY_END = /^(- |\* |#)/;
+const SEMVER = /^\d+\.\d+\.\d+$/;
 
 const normalize = (s: string) => s.replace(/\s+/g, " ").trim();
 
+// Sorted by prefix, then by the number as an integer (FR-002 before FR-010).
+const byId = (a: string, b: string) =>
+  a.slice(0, 2).localeCompare(b.slice(0, 2)) ||
+  Number(a.slice(3)) - Number(b.slice(3));
+
+// Order within a file: the Version error first, then duplicate-id errors by ID.
+function specErrors(
+  path: string,
+  version: string | null,
+  counts: Map<string, number>,
+): SpecError[] {
+  const errors: SpecError[] = [];
+  const add = (code: SpecError["code"], problem: string) =>
+    errors.push({ code, file: path, message: `${path}: ${problem}` });
+  if (version === null) add("missing-version", 'no "**Version**: x.y.z" line');
+  else if (!SEMVER.test(version))
+    add("invalid-version", `Version "${version}" is not in x.y.z form`);
+  const dups = [...counts].filter(([, n]) => n > 1);
+  for (const [id, n] of dups.sort(([a], [b]) => byId(a, b)))
+    add("duplicate-id", `${id} is defined ${n} times`);
+  return errors;
+}
+
 // Rules: research.md R1.
 export function parseSpec(path: string, text: string): ParsedSpec {
-  void path; // used by the error messages added in US2
   const lines = text.replace(/\r\n?/g, "\n").split("\n");
   let version: string | null = null;
   let versionLine: number | null = null;
   const entries = new Map<string, string>();
+  const counts = new Map<string, number>();
   let current: { id: string; parts: string[] } | null = null;
   let inFence = false;
   const addEntry = (e: { id: string; parts: string[] }) => {
-    // shortcut: a repeated ID keeps its first text; US2 reports it as duplicate-id
+    counts.set(e.id, (counts.get(e.id) ?? 0) + 1);
     if (!entries.has(e.id)) entries.set(e.id, normalize(e.parts.join("\n")));
   };
   for (const [i, line] of lines.entries()) {
@@ -78,12 +102,10 @@ export function parseSpec(path: string, text: string): ParsedSpec {
   }
   if (current) addEntry(current);
   const body = normalize(lines.filter((_, i) => i !== versionLine).join("\n"));
-  return { version, versionLine, entries, errors: [], body };
+  const errors = specErrors(path, version, counts);
+  if (version !== null && !SEMVER.test(version)) version = null;
+  return { version, versionLine, entries, errors, body };
 }
-
-// Sorted by the number as an integer (FR-002 before FR-010); one list has one prefix.
-const byNumber = (a: string, b: string) =>
-  Number(a.slice(3)) - Number(b.slice(3));
 
 function idChanges(
   a: Map<string, string>,
@@ -91,7 +113,7 @@ function idChanges(
   prefix: "FR" | "SC",
 ): IdChanges {
   const ids = (m: Map<string, string>) =>
-    [...m.keys()].filter((id) => id.startsWith(`${prefix}-`)).sort(byNumber);
+    [...m.keys()].filter((id) => id.startsWith(`${prefix}-`)).sort(byId);
   return {
     added: ids(b).filter((id) => !a.has(id)),
     removed: ids(a).filter((id) => !b.has(id)),
