@@ -67,7 +67,7 @@
 - [X] T016 [US1] Implement `diffSpecs` in `packages/spec-diff/src/diff.ts` for readable inputs: parse both sides; `contentChanged = old.body !== new.body`; build `fr`/`sc` `IdChanges` sorted "by prefix, then by the number as an integer"; `result: "pass"`. Never compare version order or bump level (FR-010). Make T010, T011 and T011b pass
 - [X] T017 [P] [US1] Implement `formatText` in `packages/spec-diff/src/format.ts` per contracts/cli.md (success path). Make T012 pass
 - [X] T018 [US1] Implement `packages/spec-diff/src/cli.ts`: argv = `process.argv.slice(2)`; if not exactly two paths, write `usage: spec-diff [--json] <old-spec> <new-spec>` to stderr and exit 2; read each file with `fs.readFileSync(path, "utf8")`; on a read failure build `{ path, readError: err.code }` instead of throwing; `diffSpecs` → `formatText` → stdout; `process.exitCode = 0` for `pass`, `2` otherwise (US2 adds `1`). Wrap the whole run in one `try/catch` that writes `internal error: <message>` to stderr and exits 2 (research R4). The file does nothing but I/O. Make T013 pass
-- [ ] T019 [US1] Run `pnpm --filter @repo/spec-diff lint check-types test`; everything passes
+- [X] T019 [US1] Run `pnpm --filter @repo/spec-diff lint check-types test`; everything passes
 
 **Checkpoint**: the MVP works. A reviewer can run the check locally (quickstart scenarios 1, 3 and 4).
 
