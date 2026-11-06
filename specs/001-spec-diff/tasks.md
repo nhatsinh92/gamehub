@@ -89,7 +89,7 @@
 ### Implementation for User Story 2
 
 - [X] T024 [US2] Extend `parseSpec` in `packages/spec-diff/src/diff.ts`: no Version line → `missing-version` (`<path>: no "**Version**: x.y.z" line`); value not matching `^\d+\.\d+\.\d+$` → `invalid-version` (`<path>: Version "<value>" is not in x.y.z form`) with `version` null; "An ID seen more than once → one `duplicate-id` error per ID, giving the count". Messages start with the `path` argument of `parseSpec(path, text)`. Order within a file: the Version error first, then `duplicate-id` errors sorted by ID
-- [ ] T025 [US2] Extend `diffSpecs` in `packages/spec-diff/src/diff.ts` with the decision flow from data-model.md: collect `unreadable-file` and parse errors from both sides (old first); any input error → `"input-error"`, `contentChanged: null`, empty lists; otherwise, if `contentChanged` and the versions are equal → add `version-not-bumped` and return `"rule-violation"`. Make T020 pass
+- [X] T025 [US2] Extend `diffSpecs` in `packages/spec-diff/src/diff.ts` with the decision flow from data-model.md: collect `unreadable-file` and parse errors from both sides (old first); any input error → `"input-error"`, `contentChanged: null`, empty lists; otherwise, if `contentChanged` and the versions are equal → add `version-not-bumped` and return `"rule-violation"`. Make T020 pass
 - [ ] T026 [P] [US2] Extend `formatText` in `packages/spec-diff/src/format.ts` for errors, `?` versions and the shorter `input-error` report. Make T021 pass
 - [ ] T027 [US2] In `packages/spec-diff/src/cli.ts`, map `result` to the exit code: `pass` → 0, `rule-violation` → 1, `input-error` → 2 (contracts/cli.md › Exit codes). Make T022 pass
 - [ ] T028 [US2] Run `pnpm --filter @repo/spec-diff lint check-types test`; everything passes

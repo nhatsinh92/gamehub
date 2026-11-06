@@ -121,31 +121,53 @@ function idChanges(
   };
 }
 
+function parseInput(s: SpecInput): ParsedSpec {
+  if ("text" in s) return parseSpec(s.path, s.text);
+  const message = `${s.path}: cannot read file (${s.readError})`;
+  return {
+    version: null,
+    versionLine: null,
+    entries: new Map(),
+    errors: [{ code: "unreadable-file", file: s.path, message }],
+    body: "",
+  };
+}
+
+// Decision flow: data-model.md.
 export function diffSpecs(oldSpec: SpecInput, newSpec: SpecInput): DiffResult {
   const files = { old: oldSpec.path, new: newSpec.path };
-  const empty = () => ({ added: [], removed: [], changed: [] });
-  if (!("text" in oldSpec) || !("text" in newSpec)) {
-    // shortcut: no unreadable-file error yet; US2 (T025) adds it
+  const a = parseInput(oldSpec);
+  const b = parseInput(newSpec);
+  const versions = { old: a.version, new: b.version };
+  const errors = [...a.errors, ...b.errors];
+  if (errors.length > 0) {
+    const empty = () => ({ added: [], removed: [], changed: [] });
     return {
       result: "input-error",
       files,
-      versions: { old: null, new: null },
+      versions,
       contentChanged: null,
       fr: empty(),
       sc: empty(),
-      errors: [],
+      errors,
     };
   }
-  const a = parseSpec(oldSpec.path, oldSpec.text);
-  const b = parseSpec(newSpec.path, newSpec.text);
-  // FR-010: version order and bump level are never compared.
+  const contentChanged = a.body !== b.body;
+  // FR-010: only equality matters; version order and bump level are never compared.
+  if (contentChanged && a.version === b.version) {
+    errors.push({
+      code: "version-not-bumped",
+      file: newSpec.path,
+      message: `${newSpec.path}: content changed but Version is still ${b.version}`,
+    });
+  }
   return {
-    result: "pass",
+    result: errors.length > 0 ? "rule-violation" : "pass",
     files,
-    versions: { old: a.version, new: b.version },
-    contentChanged: a.body !== b.body,
+    versions,
+    contentChanged,
     fr: idChanges(a.entries, b.entries, "FR"),
     sc: idChanges(a.entries, b.entries, "SC"),
-    errors: [],
+    errors,
   };
 }
