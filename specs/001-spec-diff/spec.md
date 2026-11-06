@@ -4,9 +4,9 @@
 
 **Created**: 2026-11-06
 
-**Status**: Implemented
+**Status**: Approved
 
-**Version**: 1.0.1
+**Version**: 2.0.0
 
 **Input**: User description: "a CLI check that compares two versions of the same spec file. Reviewers and CI need to see exactly which requirements changed, and every change must come with a version bump (CLAUDE.md Rule 1)."
 
@@ -50,6 +50,7 @@ On a pull request, CI runs the check on each changed spec (old version from the 
 1. **Given** the old and new spec both at 1.0.0 and FR-002's text differs, **When** CI runs the check, **Then** the check reports a "content changed but version not bumped" error and ends with a failing result.
 2. **Given** the same content change and the new spec at 1.0.1, **When** CI runs the check, **Then** the check passes and reports the change, without judging whether 1.0.1 was the right bump level.
 3. **Given** a content change only outside FR and SC (for example an edge case or assumption) and no version change, **When** CI runs the check, **Then** the check still reports the error, because the rule covers the whole spec content.
+4. **Given** the old spec at 1.2.0 and the new spec at 1.1.0, **When** CI runs the check, **Then** the check reports a `version-decreased` error and ends with a failing result (rule violation).
 
 ---
 
@@ -72,7 +73,7 @@ A later CI step (for example an AI reviewer) asks for the machine-readable form 
 
 - A file path does not exist or cannot be read: the check reports which path failed and ends with a failing result, distinct from the "version not bumped" failure.
 - A file has no `**Version**:` line, or its value is not in `x.y.z` form: the check reports which file is missing a valid version and fails.
-- The new version is lower than the old one (for example 1.2.0 → 1.1.0): accepted without error or warning. The rule only requires that the version differs; direction and bump level are for people to judge.
+- The new version is lower than the old one (for example 1.2.0 → 1.1.0): the check reports a `version-decreased` error and ends with a rule-violation result (FR-010). Whether the bump level fits the change is still for people to judge.
 - Only the Version line changed (no other edit): not an error; the report shows the two versions and empty ID lists.
 - Only whitespace or line wrapping changed (for example after the repo's formatter reflows the file): ignored. Whitespace and line-wrapping differences are not content changes, so they need no bump and do not mark any FR or SC as changed.
 - The old version does not exist because the spec is new in this PR: out of scope. The caller skips new specs; if an old path is given that does not exist, it is the "cannot be read" error above.
@@ -94,7 +95,7 @@ A later CI step (for example an AI reviewer) asks for the machine-readable form 
 - **FR-007**: The check MUST produce a human-readable report by default and a machine-readable report when asked; both MUST contain the same versions, the same added/removed/changed lists, and the same errors.
 - **FR-008**: In machine-readable mode, standard output MUST contain only the machine-readable document.
 - **FR-009**: The check MUST end with a passing result when no error was found, whether or not any requirement changed.
-- **FR-010**: The check MUST NOT judge whether the bump level (MAJOR/MINOR/PATCH) or direction (including a lower new version) fits the change, and MUST NOT evaluate the content of the spec.
+- **FR-010**: The check MUST report an error with code `version-decreased` and end with a rule-violation result when the new Version is lower than the old Version (compared as semver). It MUST NOT judge whether the bump level (MAJOR/MINOR/PATCH) fits the change, and MUST NOT evaluate the content of the spec.
 - **FR-011**: The check MUST NOT create, modify, or delete any file.
 
 ### Key Entities
@@ -125,6 +126,7 @@ A later CI step (for example an AI reviewer) asks for the machine-readable form 
 - New specs (no old version) are skipped by the caller; the check always compares two existing files.
 
 ## Changelog
+- 2.0.0 (2026-11-06): FR-010 redefined: a lower new version is now a rule violation (`version-decreased`), reversing the 0.2.0 decision to accept it. Updated the matching edge case and added US2 scenario 4. Status back to Approved until the code follows.
 - 1.0.1 (2026-11-06): Status → Implemented.
 - 1.0.0 (2026-11-06): approved by the owner. Also records the removal of the former SC-004 (reviewer reads the change in under 1 minute) and the renumbering of SC-005/SC-006 to SC-004/SC-005.
 - 0.5.0 (2026-11-06): added FR-012: report all input errors in one run.

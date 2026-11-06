@@ -218,6 +218,20 @@ Mỗi Module một entry: **Đã làm gì · Quyết định và vì sao · Vấ
 
 ---
 
+## Phần 1 (lộ trình rút gọn) — Spec đổi giữa iteration: `spec-diff` 2.0.0 (đang làm, 2026-11-06)
+
+### Đã làm gì
+- Branch `001-spec-diff-v2`. **PR 1 (chỉ spec):** FR-010 định nghĩa lại: version mới **thấp hơn** version cũ → lỗi `version-decreased`, kết quả rule-violation (exit 1). Đảo ngược quyết định Q1 ở clarify (0.2.0: chấp nhận version giảm).
+  - Sửa thẳng `spec.md` (spec đã Approved, không chạy lại `/speckit-specify`): FR-010, edge case tương ứng, thêm US2 scenario 4, bump **1.0.1 → 2.0.0** (MAJOR vì FR bị định nghĩa lại), Changelog ghi `FR-010 redefined`, Status **Implemented → Approved** (code chưa theo kịp spec).
+  - Tự kiểm bằng chính tool trước khi mở PR: so spec trên `HEAD` với bản sửa → `1.0.1 -> 2.0.0`, `FR changed: FR-010`, pass, exit 0.
+
+### Quyết định và vì sao
+- **Chọn một thay đổi MAJOR làm test cũ phải sửa** (thay vì thêm FR mới như xử lý BOM): đây là trường hợp `spec-impact` có việc thật để làm, và là đúng câu hỏi Q4 (code và test có bám theo spec đã đổi không).
+- **Tách PR spec và PR code**: PR spec được review như một quyết định (có nên đổi yêu cầu không); PR code như việc thực thi. AI không thể lặng lẽ sửa spec cho khớp code nó viết.
+- **Status quay về Approved** trong PR spec, và lên Implemented (bump PATCH) trong PR code.
+
+---
+
 ## Nợ
 
 - **M0:** chưa tự liệt kê 5 rủi ro kỹ thuật và chưa tự lập luận cách tách brief thành feature (đã xem bản tham chiếu của mentor). Trả lại trước Module 14.
