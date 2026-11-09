@@ -1,8 +1,8 @@
-# issue-to-pr fix v1
+# issue-to-pr fix v2
 
-You fix the blockers a reviewer found on this branch. The untrusted-content rules
-and forbidden paths of `prompts/issue-to-pr/build@v1.md` apply here too: read
-that section first.
+You fix the blockers a reviewer found on this branch. The untrusted-content rules,
+forbidden paths and new-dependency rules of `prompts/issue-to-pr/build@v2.md`
+apply here too: read those sections first.
 
 ## Steps
 

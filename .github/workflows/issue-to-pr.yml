@@ -76,7 +76,7 @@ jobs:
         env:
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
         run: |
-          claude -p "Follow prompts/issue-to-pr/build@v1.md exactly. The issue (#$ISSUE) is in $AI/issue.md." \
+          claude -p "Follow prompts/issue-to-pr/build@v2.md exactly. The issue (#$ISSUE) is in $AI/issue.md." \
             --add-dir "$AI" --permission-mode acceptEdits --max-turns 250 \
             --allowedTools "$WRITE_TOOLS" | tee "$AI/build.md"
           git add -A && git commit -q -m "chore: uncommitted build output (#$ISSUE)" || true
@@ -96,14 +96,14 @@ jobs:
           while :; do
             if pnpm turbo run lint check-types test --continue > "$AI/gates.log" 2>&1; then gates=pass; else gates=fail; fi
             # Read-only reviewer, a fresh session each round (it does not grade its own fix).
-            claude -p "Follow prompts/issue-to-pr/review@v1.md exactly. Issue: $AI/issue.md. Base commit: $BASE_SHA. Gates: $gates, log: $AI/gates.log." \
+            claude -p "Follow prompts/issue-to-pr/review@v2.md exactly. Issue: $AI/issue.md. Base commit: $BASE_SHA. Gates: $gates, log: $AI/gates.log." \
               --add-dir "$AI" --max-turns 60 \
               --allowedTools "Read,Glob,Grep,Bash(git diff:*),Bash(git log:*),Bash(git show:*)" > "$AI/review.md"
             cat "$AI/review.md"
             if [ "$gates" = pass ] && [ "$(tail -n 1 "$AI/review.md")" = "VERDICT: PASS" ]; then result=pass; break; fi
             [ "$fixes" -lt "$MAX_FIX_ROUNDS" ] || break
             fixes=$((fixes + 1))
-            claude -p "Follow prompts/issue-to-pr/fix@v1.md exactly. Issue: $AI/issue.md. Review: $AI/review.md. Gates: $gates, log: $AI/gates.log. Round $fixes of $MAX_FIX_ROUNDS." \
+            claude -p "Follow prompts/issue-to-pr/fix@v2.md exactly. Issue: $AI/issue.md. Review: $AI/review.md. Gates: $gates, log: $AI/gates.log. Round $fixes of $MAX_FIX_ROUNDS." \
               --add-dir "$AI" --permission-mode acceptEdits --max-turns 120 \
               --allowedTools "$WRITE_TOOLS"
             git add -A && git commit -q -m "fix: review round $fixes (#$ISSUE)" || true
@@ -122,11 +122,24 @@ jobs:
           FIXES: ${{ steps.loop.outputs.fixes }}
         run: |
           git push origin "HEAD:refs/heads/$BRANCH"
+          deps=false
+          git diff --quiet "$BASE_SHA" HEAD -- pnpm-lock.yaml || deps=true
+          echo "deps=$deps" >> "$GITHUB_OUTPUT"
           {
             echo "Closes #$ISSUE"
             echo
             echo "AI pipeline result: **$RESULT** after $FIXES fix round(s) (max $MAX_FIX_ROUNDS)."
             echo
+            if [ "$deps" = true ]; then
+              echo "## New dependencies: owner approval needed (Principle IV)"
+              echo
+              echo "Reasons are in \`plan.md\` under \`## New dependencies\`. Add the \`deps-approved\` label to approve; \`guard-deps\` blocks the merge until then."
+              echo
+              echo '```diff'
+              git diff "$BASE_SHA" HEAD -- '*package.json' | grep -E '^[+-] ' || true
+              echo '```'
+              echo
+            fi
             echo "## Final review"
             echo
             cat "$AI/review.md"
@@ -146,6 +159,7 @@ jobs:
           ABORTED: ${{ steps.build.outputs.aborted }}
           RESULT: ${{ steps.loop.outputs.result }}
           PR_URL: ${{ steps.pr.outputs.url }}
+          DEPS: ${{ steps.pr.outputs.deps }}
           JOB_STATUS: ${{ job.status }}
         run: |
           run="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
@@ -161,5 +175,6 @@ jobs:
             msg="@$SENDER Review still fails after $MAX_FIX_ROUNDS fix rounds. Draft PR: $PR_URL (open findings in its description)."
             gh issue edit "$ISSUE" --add-label ai-needs-human || true
           fi
+          [ "$DEPS" = true ] && msg="$msg It adds dependencies: check the reasons and add \`deps-approved\` to approve."
           gh issue comment "$ISSUE" --body "$msg"
           gh issue edit "$ISSUE" --remove-label ai-build || true
