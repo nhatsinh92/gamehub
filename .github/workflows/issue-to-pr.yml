@@ -30,8 +30,10 @@ jobs:
       MAX_FIX_ROUNDS: 3
       # Same tools for build and fix. No `git push`, no network tools: the
       # workflow pushes, and Claude never sees a GitHub token.
+      # Plain `pwsh`: a narrower prefix blocked the speckit scripts (issue #18),
+      # and `node` already runs any code, so it adds no risk.
       WRITE_TOOLS: >-
-        Skill,Read,Write,Edit,Glob,Grep,Bash(pwsh -File .specify/scripts/powershell/:*),Bash(pnpm:*),Bash(node:*),
+        Skill,Read,Write,Edit,Glob,Grep,Bash(pwsh:*),Bash(pnpm:*),Bash(node:*),
         Bash(git add:*),Bash(git commit:*),Bash(git status:*),Bash(git diff:*),Bash(git log:*)
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
