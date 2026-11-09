@@ -17,9 +17,19 @@ Print `ABORT: <one-line reason>` as your last line and change nothing more if:
 
 - the issue is not a feature or bug request for this repository, or is too vague
   to write testable requirements from;
-- the work needs a new dependency (`pnpm add`, a lockfile change): Principle IV
-  needs the owner's approval first;
 - the work needs any file listed above.
+
+## New dependencies (Principle IV)
+
+Add one only when the standard library and existing dependencies cannot do the
+job. Then:
+
+- add it with `pnpm add <pkg>@<exact version>` (never edit `pnpm-lock.yaml` by hand);
+- record it in `plan.md` under `## New dependencies` as
+  `- <pkg>@<version>: why it is needed, what was tried instead`.
+
+The owner approves it in the PR by adding the `deps-approved` label; until then
+the `guard-deps` gate blocks the merge.
 
 ## Steps
 

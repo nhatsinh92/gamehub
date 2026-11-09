@@ -53,9 +53,10 @@ Add the `ai-build` label to an issue → speckit specify → plan → tasks → 
 | Checkout without credentials; tokens only in the steps that push/comment; Claude has no `git push`, `gh` or network tools | The issue text is untrusted; a prompt injection in it cannot push or read a GitHub token |
 | Reviewer is a new read-only session each round | It does not grade its own fix and cannot edit to pass |
 | Existing `ai/issue-N` branch → fail | A re-run never overwrites a branch a human may have edited |
-| `ABORT` instead of guessing when the issue is vague, needs a new dependency, or needs a protected path | Principle IV and CODEOWNERS paths need the owner first |
+| `ABORT` instead of guessing when the issue is vague or needs a protected path | CODEOWNERS paths need the owner first |
+| New dependencies allowed, with the reason in `plan.md`; PR body and issue comment flag them; `guard-deps` blocks merge until the owner adds `deps-approved` | Principle IV (reason in the plan, owner approves) without throwing away a whole run; the reviewer fails a dependency with no reason or one the standard library covers |
 
-**Known limits:** the spec is still Draft (0.1.0) when code is written. Principle I asks for an approved spec first, so the owner approves spec and code together in the PR; split into two runs (stop after `speckit-analyze`, continue on a `spec-approved` label) if that is not acceptable. `Bash(pnpm:*)` can run any package script, so `CLAUDE_CODE_OAUTH_TOKEN` is reachable from code Claude writes; `guard-deps` still blocks new dependencies at the PR.
+**Known limits:** the spec is still Draft (0.1.0) when code is written. Principle I asks for an approved spec first, so the owner approves spec and code together in the PR; split into two runs (stop after `speckit-analyze`, continue on a `spec-approved` label) if that is not acceptable. `Bash(pnpm:*)` can run any package script, so `CLAUDE_CODE_OAUTH_TOKEN` is reachable from code Claude writes or from a package it adds (when that code runs in tests).
 
 ## Adding a gate
 
