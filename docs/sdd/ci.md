@@ -40,7 +40,7 @@ CI is built code-first: it is tooling with no user-facing behavior, exempt from 
 
 Workflow: [`.github/workflows/issue-to-pr.yml`](../../.github/workflows/issue-to-pr.yml). Prompts: [`prompts/issue-to-pr/`](../../prompts/issue-to-pr/).
 
-Add the `ai-build` label to an issue → speckit specify → plan → tasks → analyze → implement (one Claude session) → loop: gates (lint, types, tests) + a fresh read-only AI review; on fail, a fix session; at most 3 fixes → push `ai/issue-N`, open a PR (`Closes #N`) → comment on the issue with an @mention of whoever added the label. Review still failing after 3 fixes, or Claude printed `ABORT` → draft PR or no PR, issue labelled `ai-needs-human`. A human always merges (Principle II); the PR still passes every gate above.
+Add the `ai-build` label to an issue → speckit specify → plan → tasks → analyze (Opus session) → implement (Sonnet session) → loop: gates (lint, types, tests) + a fresh read-only AI review; on fail, one fix session (Sonnet), then a last review → push `ai/issue-N`, open a PR (`Closes #N`) → comment on the issue with an @mention of whoever added the label. Review still failing after the fix, or Claude printed `ABORT` → draft PR or no PR, issue labelled `ai-needs-human`. A human always merges (Principle II); the PR still passes every gate above.
 
 **Setup (once):**
 - Secret `AI_BOT_TOKEN`: fine-grained PAT (or GitHub App token) on this repo only, Contents + Pull requests + Issues: read/write. A PR opened with `GITHUB_TOKEN` does not trigger `pr.yml`, so the required checks would never run.
@@ -52,6 +52,7 @@ Add the `ai-build` label to an issue → speckit specify → plan → tasks → 
 | Starts only on a label | Adding a label needs triage rights; opening an issue does not. A stranger's issue cannot spend tokens or open PRs |
 | Checkout without credentials; tokens only in the steps that push/comment; Claude has no `git push`, `gh` or network tools | The issue text is untrusted; a prompt injection in it cannot push or read a GitHub token |
 | Reviewer is a new read-only session each round | It does not grade its own fix and cannot edit to pass |
+| Two build sessions: spec phase on Opus (`SPEC_MODEL`), implement and fix on Sonnet (`CODE_MODEL`); 1 fix round (`MAX_FIX_ROUNDS`) | Spec, plan and tasks need judgment; code from a reviewed task list does not. Each round costs a review + a fix; past one round the reviewer usually repeats itself |
 | Existing `ai/issue-N` branch → fail | A re-run never overwrites a branch a human may have edited |
 | Push retried 3 times; on any failure the commits are uploaded as artifact `ai-issue-N` (`work.bundle`, 7 days) and the issue comment says how to push them | Issue #18 lost two finished runs to push errors (`403`, then `fatal error in commit_refs`); re-running Claude costs far more than a manual push |
 | `ABORT` instead of guessing when the issue is vague or needs a protected path | CODEOWNERS paths need the owner first |
