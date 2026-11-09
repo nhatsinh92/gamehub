@@ -28,9 +28,11 @@ jobs:
       BRANCH: ai/issue-${{ github.event.issue.number }}
       SENDER: ${{ github.event.sender.login }}
       MAX_FIX_ROUNDS: 1
-      # Opus where judgment matters (spec, plan, tasks); Sonnet to write code.
+      # Opus where judgment matters (spec, plan, tasks); Sonnet to write and
+      # review code (review is a checklist against spec and diff).
       SPEC_MODEL: claude-opus-5-5
       CODE_MODEL: claude-sonnet-5-5
+      REVIEW_MODEL: claude-sonnet-5-5
       # Same tools for build and fix. No `git push`, no network tools: the
       # workflow pushes, and Claude never sees a GitHub token.
       # Plain `pwsh`: a narrower prefix blocked the speckit scripts (issue #18),
@@ -105,10 +107,20 @@ jobs:
           fixes=0
           while :; do
             if pnpm turbo run lint check-types test --continue > "$AI/gates.log" 2>&1; then gates=pass; else gates=fail; fi
-            # Read-only reviewer, a fresh session each round (it does not grade its own fix).
-            claude -p "Follow prompts/issue-to-pr/review@v2.md exactly. Issue: $AI/issue.md. Base commit: $BASE_SHA. Gates: $gates, log: $AI/gates.log." \
-              --add-dir "$AI" --max-turns 60 \
-              --allowedTools "Read,Glob,Grep,Bash(git diff:*),Bash(git log:*),Bash(git show:*)" > "$AI/review.md"
+            if [ "$gates" = fail ]; then
+              # No AI review on red gates: the log already says what to fix.
+              { echo "## Gates failed (lint, types, tests): AI review skipped"; echo
+                echo '```'; tail -n 60 "$AI/gates.log"; echo '```'; echo; echo "VERDICT: FAIL"; } > "$AI/review.md"
+            else
+              # Diff and commit list as files, so the reviewer reads them once
+              # instead of exploring with git. Lockfile left out (huge, guard-deps covers it).
+              git diff "$BASE_SHA" HEAD -- . ':!pnpm-lock.yaml' > "$AI/diff.patch"
+              git log --reverse --format='%h %s' "$BASE_SHA"..HEAD > "$AI/commits.txt"
+              # Read-only reviewer, a fresh session each round (it does not grade its own fix).
+              claude -p "Follow prompts/issue-to-pr/review@v3.md exactly. Issue: $AI/issue.md. Diff: $AI/diff.patch. Commits: $AI/commits.txt." \
+                --model "$REVIEW_MODEL" --add-dir "$AI" --max-turns 40 \
+                --allowedTools "Read,Glob,Grep" > "$AI/review.md"
+            fi
             cat "$AI/review.md"
             if [ "$gates" = pass ] && [ "$(tail -n 1 "$AI/review.md")" = "VERDICT: PASS" ]; then result=pass; break; fi
             [ "$fixes" -lt "$MAX_FIX_ROUNDS" ] || break
