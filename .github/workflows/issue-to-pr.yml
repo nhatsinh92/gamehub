@@ -1,0 +1,165 @@
+# AI pipeline: issue -> speckit (specify, plan, tasks, implement) -> review/fix
+# loop (max 3 fixes) -> PR -> notify a human to merge. AI never merges
+# (constitution Principle II). Starts only when someone with triage rights adds
+# the `ai-build` label to an issue. See docs/sdd/ci.md#ai-pipeline-issue-to-pr.
+name: issue-to-pr
+
+on:
+  issues:
+    types: [labeled]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: issue-to-pr-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: github.event.label.name == 'ai-build'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    permissions:
+      contents: read
+      issues: write # status comments and labels on the issue
+    env:
+      ISSUE: ${{ github.event.issue.number }}
+      BRANCH: ai/issue-${{ github.event.issue.number }}
+      SENDER: ${{ github.event.sender.login }}
+      MAX_FIX_ROUNDS: 3
+      # Same tools for build and fix. No `git push`, no network tools: the
+      # workflow pushes, and Claude never sees a GitHub token.
+      WRITE_TOOLS: >-
+        Skill,Read,Write,Edit,Glob,Grep,Bash(pwsh -File .specify/scripts/powershell/:*),Bash(pnpm:*),Bash(node:*),
+        Bash(git add:*),Bash(git commit:*),Bash(git status:*),Bash(git diff:*),Bash(git log:*)
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false # Claude's Bash must not be able to push
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1 (reads packageManager)
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Exact version: CI tool, not a project dependency (no lockfile change).
+      - run: npm install -g @anthropic-ai/claude-code@2.1.318
+
+      - name: Prepare (issue text, branch, start comment)
+        env:
+          GH_TOKEN: ${{ secrets.AI_BOT_TOKEN }}
+          ACTIONS_TOKEN: ${{ github.token }}
+        run: |
+          # runner.temp is not available in job-level env, so AI is set here.
+          AI="$RUNNER_TEMP/ai"
+          echo "AI=$AI" >> "$GITHUB_ENV"
+          mkdir -p "$AI"
+          gh auth setup-git
+          # Re-running must not overwrite a branch a human may have edited.
+          if git ls-remote --exit-code origin "refs/heads/$BRANCH" >/dev/null; then
+            echo "::error::Branch $BRANCH already exists. Delete it (and close its PR) to re-run."
+            exit 1
+          fi
+          # Issue text goes to a file, never into a shell command (script injection).
+          gh issue view "$ISSUE" --json title,body --jq '"# " + .title + "\n\n" + .body' > "$AI/issue.md"
+          git config user.name "gamehub-ai"
+          git config user.email "gamehub-ai@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+          echo "BASE_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+          GH_TOKEN="$ACTIONS_TOKEN" gh issue comment "$ISSUE" \
+            --body "AI pipeline started: speckit → code → review/fix (max $MAX_FIX_ROUNDS). Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+
+      - name: Build (speckit specify -> plan -> tasks -> implement)
+        id: build
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        run: |
+          claude -p "Follow prompts/issue-to-pr/build@v1.md exactly. The issue (#$ISSUE) is in $AI/issue.md." \
+            --add-dir "$AI" --permission-mode acceptEdits --max-turns 250 \
+            --allowedTools "$WRITE_TOOLS" | tee "$AI/build.md"
+          git add -A && git commit -q -m "chore: uncommitted build output (#$ISSUE)" || true
+          last=$(tail -n 1 "$AI/build.md")
+          if [ "${last#ABORT}" != "$last" ] || [ "$(git rev-list --count "$BASE_SHA"..HEAD)" = 0 ]; then
+            echo "aborted=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Review / fix loop
+        id: loop
+        if: steps.build.outputs.aborted != 'true'
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        run: |
+          result=fail
+          fixes=0
+          while :; do
+            if pnpm turbo run lint check-types test --continue > "$AI/gates.log" 2>&1; then gates=pass; else gates=fail; fi
+            # Read-only reviewer, a fresh session each round (it does not grade its own fix).
+            claude -p "Follow prompts/issue-to-pr/review@v1.md exactly. Issue: $AI/issue.md. Base commit: $BASE_SHA. Gates: $gates, log: $AI/gates.log." \
+              --add-dir "$AI" --max-turns 60 \
+              --allowedTools "Read,Glob,Grep,Bash(git diff:*),Bash(git log:*),Bash(git show:*)" > "$AI/review.md"
+            cat "$AI/review.md"
+            if [ "$gates" = pass ] && [ "$(tail -n 1 "$AI/review.md")" = "VERDICT: PASS" ]; then result=pass; break; fi
+            [ "$fixes" -lt "$MAX_FIX_ROUNDS" ] || break
+            fixes=$((fixes + 1))
+            claude -p "Follow prompts/issue-to-pr/fix@v1.md exactly. Issue: $AI/issue.md. Review: $AI/review.md. Gates: $gates, log: $AI/gates.log. Round $fixes of $MAX_FIX_ROUNDS." \
+              --add-dir "$AI" --permission-mode acceptEdits --max-turns 120 \
+              --allowedTools "$WRITE_TOOLS"
+            git add -A && git commit -q -m "fix: review round $fixes (#$ISSUE)" || true
+          done
+          echo "result=$result" >> "$GITHUB_OUTPUT"
+          echo "fixes=$fixes" >> "$GITHUB_OUTPUT"
+
+      - name: Push and open PR
+        id: pr
+        if: steps.build.outputs.aborted != 'true'
+        env:
+          # A PAT/App token, not GITHUB_TOKEN: a PR opened by GITHUB_TOKEN does
+          # not trigger pr.yml, so the required checks would never run.
+          GH_TOKEN: ${{ secrets.AI_BOT_TOKEN }}
+          RESULT: ${{ steps.loop.outputs.result }}
+          FIXES: ${{ steps.loop.outputs.fixes }}
+        run: |
+          git push origin "HEAD:refs/heads/$BRANCH"
+          {
+            echo "Closes #$ISSUE"
+            echo
+            echo "AI pipeline result: **$RESULT** after $FIXES fix round(s) (max $MAX_FIX_ROUNDS)."
+            echo
+            echo "## Final review"
+            echo
+            cat "$AI/review.md"
+            echo
+            echo "_Generated by issue-to-pr. A human reviews spec + code and merges (constitution Principle II)._"
+          } > "$AI/pr-body.md"
+          draft=""
+          [ "$RESULT" = pass ] || draft="--draft"
+          url=$(gh pr create $draft --base main --head "$BRANCH" \
+            --title "$(head -n 1 "$AI/issue.md" | sed 's/^# //') (#$ISSUE)" --body-file "$AI/pr-body.md")
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+
+      - name: Notify
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }} # posted by github-actions[bot], so the @mention notifies
+          ABORTED: ${{ steps.build.outputs.aborted }}
+          RESULT: ${{ steps.loop.outputs.result }}
+          PR_URL: ${{ steps.pr.outputs.url }}
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          run="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          if [ "$ABORTED" = true ]; then
+            msg="@$SENDER AI pipeline stopped without a PR: $(tail -n 1 "$AI/build.md" 2>/dev/null). Run: $run"
+            gh issue edit "$ISSUE" --add-label ai-needs-human || true
+          elif [ "$JOB_STATUS" != success ] || [ -z "$PR_URL" ]; then
+            msg="@$SENDER AI pipeline failed. Run: $run"
+            gh issue edit "$ISSUE" --add-label ai-needs-human || true
+          elif [ "$RESULT" = pass ]; then
+            msg="@$SENDER PR ready for your review and merge: $PR_URL"
+          else
+            msg="@$SENDER Review still fails after $MAX_FIX_ROUNDS fix rounds. Draft PR: $PR_URL (open findings in its description)."
+            gh issue edit "$ISSUE" --add-label ai-needs-human || true
+          fi
+          gh issue comment "$ISSUE" --body "$msg"
+          gh issue edit "$ISSUE" --remove-label ai-build || true

@@ -36,6 +36,27 @@ CI is built code-first: it is tooling with no user-facing behavior, exempt from 
 - **Explicit `any` is not linted** (`no-explicit-any` was dropped). Only review catches it.
 - **AI review is not a gate.** A future AI review step may only comment (`contents: read`, `pull-requests: write`), runs only with the `ai-review` label, never on fork PRs.
 
+## AI pipeline: issue-to-pr
+
+Workflow: [`.github/workflows/issue-to-pr.yml`](../../.github/workflows/issue-to-pr.yml). Prompts: [`prompts/issue-to-pr/`](../../prompts/issue-to-pr/).
+
+Add the `ai-build` label to an issue → speckit specify → plan → tasks → analyze → implement (one Claude session) → loop: gates (lint, types, tests) + a fresh read-only AI review; on fail, a fix session; at most 3 fixes → push `ai/issue-N`, open a PR (`Closes #N`) → comment on the issue with an @mention of whoever added the label. Review still failing after 3 fixes, or Claude printed `ABORT` → draft PR or no PR, issue labelled `ai-needs-human`. A human always merges (Principle II); the PR still passes every gate above.
+
+**Setup (once):**
+- Secret `AI_BOT_TOKEN`: fine-grained PAT (or GitHub App token) on this repo only, Contents + Pull requests + Issues: read/write. A PR opened with `GITHUB_TOKEN` does not trigger `pr.yml`, so the required checks would never run.
+- Secret `CLAUDE_CODE_OAUTH_TOKEN` (already used by `spec-impact`).
+- Labels `ai-build` and `ai-needs-human`.
+
+| Decision | Why |
+|---|---|
+| Starts only on a label | Adding a label needs triage rights; opening an issue does not. A stranger's issue cannot spend tokens or open PRs |
+| Checkout without credentials; tokens only in the steps that push/comment; Claude has no `git push`, `gh` or network tools | The issue text is untrusted; a prompt injection in it cannot push or read a GitHub token |
+| Reviewer is a new read-only session each round | It does not grade its own fix and cannot edit to pass |
+| Existing `ai/issue-N` branch → fail | A re-run never overwrites a branch a human may have edited |
+| `ABORT` instead of guessing when the issue is vague, needs a new dependency, or needs a protected path | Principle IV and CODEOWNERS paths need the owner first |
+
+**Known limits:** the spec is still Draft (0.1.0) when code is written. Principle I asks for an approved spec first, so the owner approves spec and code together in the PR; split into two runs (stop after `speckit-analyze`, continue on a `spec-approved` label) if that is not acceptable. `Bash(pnpm:*)` can run any package script, so `CLAUDE_CODE_OAUTH_TOKEN` is reachable from code Claude writes; `guard-deps` still blocks new dependencies at the PR.
+
 ## Adding a gate
 
 Follow the constitution Growth rule: when review finds the same defect twice, add a check here, prove it with a PR made to fail on purpose, and add a row to the Gates table.
