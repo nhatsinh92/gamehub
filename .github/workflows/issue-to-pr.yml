@@ -27,13 +27,21 @@ jobs:
       ISSUE: ${{ github.event.issue.number }}
       BRANCH: ai/issue-${{ github.event.issue.number }}
       SENDER: ${{ github.event.sender.login }}
-      MAX_FIX_ROUNDS: 3
+      MAX_FIX_ROUNDS: 1
+      # Opus where judgment matters (spec, plan, tasks); Sonnet to write and
+      # review code (review is a checklist against spec and diff).
+      SPEC_MODEL: claude-opus-5-5
+      CODE_MODEL: claude-sonnet-5-5
+      REVIEW_MODEL: claude-sonnet-5-5
       # Same tools for build and fix. No `git push`, no network tools: the
       # workflow pushes, and Claude never sees a GitHub token.
-      # Plain `pwsh`: a narrower prefix blocked the speckit scripts (issue #18),
-      # and `node` already runs any code, so it adds no risk.
+      # Speckit skills run their scripts by path (`.specify/scripts/powershell/x.ps1 -Json`),
+      # not via `pwsh`; without the path entries every script call was denied (issue #18).
+      # The scripts are executable with a pwsh shebang. `node` already runs any
+      # code, so these entries add no risk.
       WRITE_TOOLS: >-
         Skill,Read,Write,Edit,Glob,Grep,Bash(pwsh:*),Bash(pnpm:*),Bash(node:*),
+        Bash(.specify/scripts/powershell/:*),Bash(./.specify/scripts/powershell/:*),
         Bash(git add:*),Bash(git commit:*),Bash(git status:*),Bash(git diff:*),Bash(git log:*)
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -73,17 +81,22 @@ jobs:
           GH_TOKEN="$ACTIONS_TOKEN" gh issue comment "$ISSUE" \
             --body "AI pipeline started: speckit → code → review/fix (max $MAX_FIX_ROUNDS). Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
 
-      - name: Build (speckit specify -> plan -> tasks -> implement)
+      - name: Build (spec phase on SPEC_MODEL, implement phase on CODE_MODEL)
         id: build
         env:
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
         run: |
-          claude -p "Follow prompts/issue-to-pr/build@v2.md exactly. The issue (#$ISSUE) is in $AI/issue.md." \
-            --add-dir "$AI" --permission-mode acceptEdits --max-turns 250 \
-            --allowedTools "$WRITE_TOOLS" | tee "$AI/build.md"
-          git add -A && git commit -q -m "chore: uncommitted build output (#$ISSUE)" || true
-          last=$(tail -n 1 "$AI/build.md")
-          if [ "${last#ABORT}" != "$last" ] || [ "$(git rev-list --count "$BASE_SHA"..HEAD)" = 0 ]; then
+          # phase, model, max turns. Fails (non-zero) when Claude printed ABORT.
+          run_phase() {
+            claude -p "Follow prompts/issue-to-pr/build@v3.md exactly, phase \`$1\` only. The issue (#$ISSUE) is in $AI/issue.md." \
+              --model "$2" --add-dir "$AI" --permission-mode acceptEdits --max-turns "$3" \
+              --allowedTools "$WRITE_TOOLS" | tee -a "$AI/build.md"
+            git add -A && git commit -q -m "chore: uncommitted $1 output (#$ISSUE)" || true
+            last=$(tail -n 1 "$AI/build.md")
+            [ "${last#ABORT}" = "$last" ]
+          }
+          if ! run_phase spec "$SPEC_MODEL" 120 || ! run_phase implement "$CODE_MODEL" 200 \
+            || [ "$(git rev-list --count "$BASE_SHA"..HEAD)" = 0 ]; then
             echo "aborted=true" >> "$GITHUB_OUTPUT"
           fi
 
@@ -97,16 +110,26 @@ jobs:
           fixes=0
           while :; do
             if pnpm turbo run lint check-types test --continue > "$AI/gates.log" 2>&1; then gates=pass; else gates=fail; fi
-            # Read-only reviewer, a fresh session each round (it does not grade its own fix).
-            claude -p "Follow prompts/issue-to-pr/review@v2.md exactly. Issue: $AI/issue.md. Base commit: $BASE_SHA. Gates: $gates, log: $AI/gates.log." \
-              --add-dir "$AI" --max-turns 60 \
-              --allowedTools "Read,Glob,Grep,Bash(git diff:*),Bash(git log:*),Bash(git show:*)" > "$AI/review.md"
+            if [ "$gates" = fail ]; then
+              # No AI review on red gates: the log already says what to fix.
+              { echo "## Gates failed (lint, types, tests): AI review skipped"; echo
+                echo '```'; tail -n 60 "$AI/gates.log"; echo '```'; echo; echo "VERDICT: FAIL"; } > "$AI/review.md"
+            else
+              # Diff and commit list as files, so the reviewer reads them once
+              # instead of exploring with git. Lockfile left out (huge, guard-deps covers it).
+              git diff "$BASE_SHA" HEAD -- . ':!pnpm-lock.yaml' > "$AI/diff.patch"
+              git log --reverse --format='%h %s' "$BASE_SHA"..HEAD > "$AI/commits.txt"
+              # Read-only reviewer, a fresh session each round (it does not grade its own fix).
+              claude -p "Follow prompts/issue-to-pr/review@v3.md exactly. Issue: $AI/issue.md. Diff: $AI/diff.patch. Commits: $AI/commits.txt." \
+                --model "$REVIEW_MODEL" --add-dir "$AI" --max-turns 40 \
+                --allowedTools "Read,Glob,Grep" > "$AI/review.md"
+            fi
             cat "$AI/review.md"
             if [ "$gates" = pass ] && [ "$(tail -n 1 "$AI/review.md")" = "VERDICT: PASS" ]; then result=pass; break; fi
             [ "$fixes" -lt "$MAX_FIX_ROUNDS" ] || break
             fixes=$((fixes + 1))
-            claude -p "Follow prompts/issue-to-pr/fix@v2.md exactly. Issue: $AI/issue.md. Review: $AI/review.md. Gates: $gates, log: $AI/gates.log. Round $fixes of $MAX_FIX_ROUNDS." \
-              --add-dir "$AI" --permission-mode acceptEdits --max-turns 120 \
+            claude -p "Follow prompts/issue-to-pr/fix@v3.md exactly. Issue: $AI/issue.md. Review: $AI/review.md. Gates: $gates, log: $AI/gates.log. Round $fixes of $MAX_FIX_ROUNDS." \
+              --model "$CODE_MODEL" --add-dir "$AI" --permission-mode acceptEdits --max-turns 120 \
               --allowedTools "$WRITE_TOOLS"
             git add -A && git commit -q -m "fix: review round $fixes (#$ISSUE)" || true
           done
