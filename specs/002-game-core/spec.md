@@ -4,9 +4,9 @@
 
 **Created**: 2026-11-09
 
-**Status**: Draft
+**Status**: Implemented
 
-**Version**: 0.1.0
+**Version**: 1.0.0
 
 **Input**: User description: GitHub issue #18 "game-core: shared game context, server adapters and HTTP client for all games". Every game needs to load its config and the player's state, submit a round result, and send tracking events to the host app. A shared, tested package does this once so games never call the server directly and never trust a malformed server response.
 
@@ -180,4 +180,5 @@ Other defaults:
 
 ## Changelog
 
+- 1.0.0 (2026-11-10): approved by the owner; Status → Implemented (all 52 tasks done in packages/game-core, PR #22).
 - 0.1.0 (2026-11-09): initial draft from issue #18.
