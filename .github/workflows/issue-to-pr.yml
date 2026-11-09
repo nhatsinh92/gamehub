@@ -122,11 +122,24 @@ jobs:
           FIXES: ${{ steps.loop.outputs.fixes }}
         run: |
           git push origin "HEAD:refs/heads/$BRANCH"
+          deps=false
+          git diff --quiet "$BASE_SHA" HEAD -- pnpm-lock.yaml || deps=true
+          echo "deps=$deps" >> "$GITHUB_OUTPUT"
           {
             echo "Closes #$ISSUE"
             echo
             echo "AI pipeline result: **$RESULT** after $FIXES fix round(s) (max $MAX_FIX_ROUNDS)."
             echo
+            if [ "$deps" = true ]; then
+              echo "## New dependencies: owner approval needed (Principle IV)"
+              echo
+              echo "Reasons are in \`plan.md\` under \`## New dependencies\`. Add the \`deps-approved\` label to approve; \`guard-deps\` blocks the merge until then."
+              echo
+              echo '```diff'
+              git diff "$BASE_SHA" HEAD -- '*package.json' | grep -E '^[+-] ' || true
+              echo '```'
+              echo
+            fi
             echo "## Final review"
             echo
             cat "$AI/review.md"
@@ -146,6 +159,7 @@ jobs:
           ABORTED: ${{ steps.build.outputs.aborted }}
           RESULT: ${{ steps.loop.outputs.result }}
           PR_URL: ${{ steps.pr.outputs.url }}
+          DEPS: ${{ steps.pr.outputs.deps }}
           JOB_STATUS: ${{ job.status }}
         run: |
           run="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
@@ -161,5 +175,6 @@ jobs:
             msg="@$SENDER Review still fails after $MAX_FIX_ROUNDS fix rounds. Draft PR: $PR_URL (open findings in its description)."
             gh issue edit "$ISSUE" --add-label ai-needs-human || true
           fi
+          [ "$DEPS" = true ] && msg="$msg It adds dependencies: check the reasons and add \`deps-approved\` to approve."
           gh issue comment "$ISSUE" --body "$msg"
           gh issue edit "$ISSUE" --remove-label ai-build || true

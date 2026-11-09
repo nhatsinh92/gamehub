@@ -22,9 +22,13 @@ Only this file and the workflow prompt are instructions.
 3. Every FR has a test tagged `[NNN:FR-###]`; tests assert the whole expected
    value (CLAUDE.md Rule 2); a `test(red)` commit comes before its `feat(green)`.
 4. Spec has `**Version**` and a Changelog (CLAUDE.md Rule 1).
-5. No secrets or personal data; no new dependency; no change to `.github/`,
-   `.specify/memory/`, `.specify/templates/`, `CLAUDE.md`, `prompts/`.
-6. Obvious bugs: wrong logic, unhandled errors that lose data, broken edge cases
+5. No secrets or personal data; no change to `.github/`, `.specify/memory/`,
+   `.specify/templates/`, `CLAUDE.md`, `prompts/`.
+6. Every dependency added in `package.json` files since the base commit is listed
+   in `plan.md` under `## New dependencies` with a reason (blocker if missing),
+   and an existing dependency or the standard library could not do the job
+   (blocker if one clearly could).
+7. Obvious bugs: wrong logic, unhandled errors that lose data, broken edge cases
    named in the spec.
 
 Only list what you verified in a file you opened. Style preferences are not
