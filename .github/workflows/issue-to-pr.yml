@@ -123,7 +123,12 @@ jobs:
           RESULT: ${{ steps.loop.outputs.result }}
           FIXES: ${{ steps.loop.outputs.fixes }}
         run: |
-          git push origin "HEAD:refs/heads/$BRANCH"
+          # Retry: GitHub sometimes rejects with "fatal error in commit_refs" (issue #18).
+          for i in 1 2 3; do
+            git push origin "HEAD:refs/heads/$BRANCH" && break
+            [ "$i" = 3 ] && exit 1
+            sleep $((i * 30))
+          done
           deps=false
           git diff --quiet "$BASE_SHA" HEAD -- pnpm-lock.yaml || deps=true
           echo "deps=$deps" >> "$GITHUB_OUTPUT"
@@ -154,6 +159,24 @@ jobs:
             --title "$(head -n 1 "$AI/issue.md" | sed 's/^# //') (#$ISSUE)" --body-file "$AI/pr-body.md")
           echo "url=$url" >> "$GITHUB_OUTPUT"
 
+      # On any failure after the branch was created, keep Claude's commits so a
+      # human can push them instead of paying for a new run.
+      - name: Bundle work on failure
+        if: failure() && env.BASE_SHA != ''
+        run: git bundle create "$AI/work.bundle" "$BASE_SHA..$BRANCH" || echo "No commits to keep."
+      - name: Upload work on failure
+        id: keep
+        if: failure() && env.BASE_SHA != ''
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ai-issue-${{ github.event.issue.number }}
+          path: |
+            ${{ runner.temp }}/ai/work.bundle
+            ${{ runner.temp }}/ai/build.md
+            ${{ runner.temp }}/ai/review.md
+          if-no-files-found: ignore
+          retention-days: 7
+
       - name: Notify
         if: always()
         env:
@@ -162,6 +185,7 @@ jobs:
           RESULT: ${{ steps.loop.outputs.result }}
           PR_URL: ${{ steps.pr.outputs.url }}
           DEPS: ${{ steps.pr.outputs.deps }}
+          KEPT_URL: ${{ steps.keep.outputs.artifact-url }}
           JOB_STATUS: ${{ job.status }}
         run: |
           run="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
@@ -170,6 +194,9 @@ jobs:
             gh issue edit "$ISSUE" --add-label ai-needs-human || true
           elif [ "$JOB_STATUS" != success ] || [ -z "$PR_URL" ]; then
             msg="@$SENDER AI pipeline failed. Run: $run"
+            [ -n "$KEPT_URL" ] && msg="$msg
+          The work is kept in artifact $KEPT_URL (7 days). To push it: unzip, then
+          \`git fetch work.bundle $BRANCH:$BRANCH && git push origin $BRANCH\` and open the PR."
             gh issue edit "$ISSUE" --add-label ai-needs-human || true
           elif [ "$RESULT" = pass ]; then
             msg="@$SENDER PR ready for your review and merge: $PR_URL"
