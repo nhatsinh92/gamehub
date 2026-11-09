@@ -53,6 +53,7 @@ Add the `ai-build` label to an issue → speckit specify → plan → tasks → 
 | Checkout without credentials; tokens only in the steps that push/comment; Claude has no `git push`, `gh` or network tools | The issue text is untrusted; a prompt injection in it cannot push or read a GitHub token |
 | Reviewer is a new read-only session each round | It does not grade its own fix and cannot edit to pass |
 | Existing `ai/issue-N` branch → fail | A re-run never overwrites a branch a human may have edited |
+| Push retried 3 times; on any failure the commits are uploaded as artifact `ai-issue-N` (`work.bundle`, 7 days) and the issue comment says how to push them | Issue #18 lost two finished runs to push errors (`403`, then `fatal error in commit_refs`); re-running Claude costs far more than a manual push |
 | `ABORT` instead of guessing when the issue is vague or needs a protected path | CODEOWNERS paths need the owner first |
 | New dependencies allowed, with the reason in `plan.md`; PR body and issue comment flag them; `guard-deps` blocks merge until the owner adds `deps-approved` | Principle IV (reason in the plan, owner approves) without throwing away a whole run; the reviewer fails a dependency with no reason or one the standard library covers |
 
