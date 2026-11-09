@@ -86,12 +86,18 @@ jobs:
         env:
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
         run: |
-          # phase, model, max turns. Fails (non-zero) when Claude printed ABORT.
+          # phase, model, max turns. Returns non-zero when Claude printed ABORT;
+          # fails the step when Claude itself failed (usage limit, max turns, crash).
           run_phase() {
             claude -p "Follow prompts/issue-to-pr/build@v3.md exactly, phase \`$1\` only. The issue (#$ISSUE) is in $AI/issue.md." \
               --model "$2" --add-dir "$AI" --permission-mode acceptEdits --max-turns "$3" \
               --allowedTools "$WRITE_TOOLS" | tee -a "$AI/build.md"
+            rc=${PIPESTATUS[0]} # tee hides claude's exit code (issue #18: a usage limit counted as success)
             git add -A && git commit -q -m "chore: uncommitted $1 output (#$ISSUE)" || true
+            if [ "$rc" != 0 ]; then
+              echo "::error::claude exited $rc in phase $1. Partial work is committed and kept in the artifact."
+              exit "$rc"
+            fi
             last=$(tail -n 1 "$AI/build.md")
             [ "${last#ABORT}" = "$last" ]
           }
@@ -130,11 +136,38 @@ jobs:
             fixes=$((fixes + 1))
             claude -p "Follow prompts/issue-to-pr/fix@v3.md exactly. Issue: $AI/issue.md. Review: $AI/review.md. Gates: $gates, log: $AI/gates.log. Round $fixes of $MAX_FIX_ROUNDS." \
               --model "$CODE_MODEL" --add-dir "$AI" --permission-mode acceptEdits --max-turns 120 \
-              --allowedTools "$WRITE_TOOLS"
+              --allowedTools "$WRITE_TOOLS" | tee "$AI/fix.md"
+            rc=${PIPESTATUS[0]}
             git add -A && git commit -q -m "fix: review round $fixes (#$ISSUE)" || true
+            [ "$rc" = 0 ] || { echo "::error::claude exited $rc in fix round $fixes."; exit "$rc"; }
           done
           echo "result=$result" >> "$GITHUB_OUTPUT"
           echo "fixes=$fixes" >> "$GITHUB_OUTPUT"
+
+      # Only when gates and review pass: the spec then describes code that exists.
+      # CLAUDE.md Rule 1: a Draft (0.x) becomes 1.0.0, approved when the owner
+      # merges this PR; an already approved spec gets a PATCH bump (status only).
+      - name: Mark spec Implemented
+        if: steps.build.outputs.aborted != 'true' && steps.loop.outputs.result == 'pass'
+        run: |
+          dir=$(node -p 'require("./.specify/feature.json").feature_directory')
+          spec="$dir/spec.md"
+          v=$(sed -n 's/^\*\*Version\*\*: \([0-9]*\.[0-9]*\.[0-9]*\)$/\1/p' "$spec")
+          [ -n "$v" ] || { echo "::error file=$spec::no **Version**: x.y.z line"; exit 1; }
+          IFS=. read -r major minor patch <<< "$v"
+          if [ "$major" = 0 ]; then
+            new=1.0.0 note="approved by the owner by merging the PR; Status → Implemented (issue #$ISSUE)"
+          else
+            new="$major.$minor.$((patch + 1))" note="Status → Implemented (issue #$ISSUE)"
+          fi
+          line="- $new ($(date -u +%F)): $note."
+          sed -i "s/^\*\*Status\*\*: .*/**Status**: Implemented/; s/^\*\*Version\*\*: .*/**Version**: $new/" "$spec"
+          # Newest first: insert above the first entry under ## Changelog (or append if none).
+          awk -v line="$line" '/^## Changelog/ { c = 1 } c == 1 && /^- / { print line; c = 2 } { print } END { if (c == 1) print line }' \
+            "$spec" > "$spec.tmp" && mv "$spec.tmp" "$spec"
+          git add "$spec" && git commit -q -m "docs(spec): $(basename "$dir") $new, Status Implemented (#$ISSUE)"
+          git show HEAD~1:"$spec" > "$AI/old-spec.md"
+          node packages/spec-diff/src/cli.ts "$AI/old-spec.md" "$spec"
 
       - name: Push and open PR
         id: pr
@@ -217,6 +250,9 @@ jobs:
             gh issue edit "$ISSUE" --add-label ai-needs-human || true
           elif [ "$JOB_STATUS" != success ] || [ -z "$PR_URL" ]; then
             msg="@$SENDER AI pipeline failed. Run: $run"
+            limit=$(grep -h -m1 "hit your .*limit" "$AI"/*.md 2>/dev/null | head -n 1)
+            [ -n "$limit" ] && msg="$msg
+          Stopped by the Claude usage limit: \"$limit\". Push the kept work (below) and finish it after the reset."
             [ -n "$KEPT_URL" ] && msg="$msg
           The work is kept in artifact $KEPT_URL (7 days). To push it: unzip, then
           \`git fetch work.bundle $BRANCH:$BRANCH && git push origin $BRANCH\` and open the PR."
