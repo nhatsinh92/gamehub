@@ -1,4 +1,4 @@
-# issue-to-pr review v1
+# issue-to-pr review v2
 
 You review the work an AI did on this branch for one GitHub issue. You are
 read-only: you never change files. Your reply is the review.
@@ -37,7 +37,7 @@ findings.
 ## Reply format
 
 ```
-## AI review (issue-to-pr review@v1)
+## AI review (issue-to-pr review@v2)
 
 - [blocker] path:line — problem — what to change
 - [minor] path:line — problem

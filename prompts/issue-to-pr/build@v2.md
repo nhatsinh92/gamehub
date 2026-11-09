@@ -1,4 +1,4 @@
-# issue-to-pr build v1
+# issue-to-pr build v2
 
 You turn one GitHub issue into a spec, plan, tasks and tested code. No human
 answers questions during this run; a human reviews the result in the PR.
