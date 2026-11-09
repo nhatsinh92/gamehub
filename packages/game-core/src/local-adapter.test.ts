@@ -35,7 +35,11 @@ function setup() {
     },
     fetchFunc: forbidden.fetchFunc,
   });
-  return { env: { gameId: "g1", http }, forbidden, tokenCalls: () => tokenCalls };
+  return {
+    env: { gameId: "g1", http },
+    forbidden,
+    tokenCalls: () => tokenCalls,
+  };
 }
 
 describe("LocalAdapter", () => {
@@ -62,10 +66,23 @@ describe("LocalAdapter", () => {
   });
 
   test("[002:FR-011] mock values are valid and mutation-safe", async () => {
-    expect(LOCAL_MOCK_DATA).toEqual({ config: CONFIG, currentUser: USER, result: RESULT });
-    expect(parseGameConfig(LOCAL_MOCK_DATA.config)).toEqual({ ok: true, data: CONFIG });
-    expect(parseCurrentUser(LOCAL_MOCK_DATA.currentUser)).toEqual({ ok: true, data: USER });
-    expect(parseGameResult(LOCAL_MOCK_DATA.result)).toEqual({ ok: true, data: RESULT });
+    expect(LOCAL_MOCK_DATA).toEqual({
+      config: CONFIG,
+      currentUser: USER,
+      result: RESULT,
+    });
+    expect(parseGameConfig(LOCAL_MOCK_DATA.config)).toEqual({
+      ok: true,
+      data: CONFIG,
+    });
+    expect(parseCurrentUser(LOCAL_MOCK_DATA.currentUser)).toEqual({
+      ok: true,
+      data: USER,
+    });
+    expect(parseGameResult(LOCAL_MOCK_DATA.result)).toEqual({
+      ok: true,
+      data: RESULT,
+    });
     const out = await LocalAdapter.getConfig(setup().env);
     if (out.ok) out.data["mode"] = "changed";
     expect(LOCAL_MOCK_DATA.config).toEqual(CONFIG);

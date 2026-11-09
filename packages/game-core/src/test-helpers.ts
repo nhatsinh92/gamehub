@@ -16,7 +16,10 @@ export function fakeFetch(
   handler: (url: string, init: RequestInit) => Response | Promise<Response>,
 ): { fetchFunc: typeof fetch; calls: RecordedCall[] } {
   const calls: RecordedCall[] = [];
-  const fetchFunc = ((input: string | URL | Request, init: RequestInit = {}) => {
+  const fetchFunc = ((
+    input: string | URL | Request,
+    init: RequestInit = {},
+  ) => {
     const url = String(input);
     const headers: Record<string, string> = {};
     new Headers(init.headers).forEach((v, k) => {

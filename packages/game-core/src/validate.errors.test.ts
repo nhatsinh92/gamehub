@@ -60,7 +60,10 @@ describe("current user validation", () => {
       { remainingTurns: "3" },
       fail("data.remainingTurns", "integer >= 0", "string"),
     ],
-    [{ bestScore: Infinity }, fail("data.bestScore", "finite number", "number")],
+    [
+      { bestScore: Infinity },
+      fail("data.bestScore", "finite number", "number"),
+    ],
     [
       { currentRank: 0 },
       fail("data.currentRank", "integer >= 1 or null", "number"),

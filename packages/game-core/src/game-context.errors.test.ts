@@ -124,9 +124,8 @@ describe("context failures", () => {
       adapter: RemoteAdapter,
       httpConfig: httpConfig(failingFetch().fetchFunc),
     });
-    const out = await ctx.run(
-      (c): Promise<unknown> =>
-        name === "submitResult" ? c.submitResult(1) : c[name](),
+    const out = await ctx.run((c): Promise<unknown> =>
+      name === "submitResult" ? c.submitResult(1) : c[name](),
     );
     expect(out).toBeNull();
     expect(ctx.snapshot()).toEqual({

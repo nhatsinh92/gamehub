@@ -37,7 +37,9 @@ function deferred() {
 
 describe("GameContextProvider", () => {
   test("[002:FR-012] useGameContext outside the provider throws", () => {
-    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    (
+      globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
+    ).IS_REACT_ACT_ENVIRONMENT = true;
     const Probe = () => {
       useGameContext();
       return null;

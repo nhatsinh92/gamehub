@@ -43,7 +43,10 @@ describe("http client failures", () => {
     });
     expect(await http.request(ME)).toEqual({
       ok: false,
-      error: { kind: "network", message: "Network error: GET /g1/v1/me failed" },
+      error: {
+        kind: "network",
+        message: "Network error: GET /g1/v1/me failed",
+      },
     });
   });
 
@@ -83,16 +86,21 @@ describe("http client failures", () => {
     ["rejects", () => Promise.reject(new Error(TOKEN))],
     ["empty string", () => ""],
     ["non-string", (() => 42) as unknown as () => string],
-  ])("[002:FR-002] token function that %s", async (_name, getAccessTokenFunc) => {
-    const { fetchFunc, calls } = fakeFetch(() => jsonResponse(200, { data: {} }));
-    const http = createHttpClient({ baseUrl, getAccessTokenFunc, fetchFunc });
-    expect(await http.request(ME)).toEqual({
-      ok: false,
-      error: {
-        kind: "token",
-        message: "Access token unavailable: GET /g1/v1/me not sent",
-      },
-    });
-    expect(calls).toEqual([]);
-  });
+  ])(
+    "[002:FR-002] token function that %s",
+    async (_name, getAccessTokenFunc) => {
+      const { fetchFunc, calls } = fakeFetch(() =>
+        jsonResponse(200, { data: {} }),
+      );
+      const http = createHttpClient({ baseUrl, getAccessTokenFunc, fetchFunc });
+      expect(await http.request(ME)).toEqual({
+        ok: false,
+        error: {
+          kind: "token",
+          message: "Access token unavailable: GET /g1/v1/me not sent",
+        },
+      });
+      expect(calls).toEqual([]);
+    },
+  );
 });

@@ -6,11 +6,6 @@ import type {
   Outcome,
 } from "./types.ts";
 
-const STUB: Outcome<never> = {
-  ok: false,
-  error: { kind: "unknown", message: "stub" },
-};
-
 export const LOCAL_MOCK_DATA: {
   readonly config: GameConfig;
   readonly currentUser: CurrentUser;
@@ -37,8 +32,12 @@ export const LOCAL_MOCK_DATA: {
   }),
 });
 
+function serve<T>(data: T): Promise<Outcome<T>> {
+  return Promise.resolve({ ok: true, data: structuredClone(data) });
+}
+
 export const LocalAdapter: GameAdapter = {
-  getConfig: () => Promise.resolve(STUB),
-  getCurrentUser: () => Promise.resolve(STUB),
-  submitResult: () => Promise.resolve(STUB),
+  getConfig: () => serve<GameConfig>(LOCAL_MOCK_DATA.config),
+  getCurrentUser: () => serve<CurrentUser>(LOCAL_MOCK_DATA.currentUser),
+  submitResult: () => serve<GameResult>(LOCAL_MOCK_DATA.result),
 };

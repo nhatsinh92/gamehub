@@ -32,13 +32,7 @@ export interface TrackingEvent {
 }
 
 export type ErrorKind =
-  | "network"
-  | "http"
-  | "parse"
-  | "validation"
-  | "token"
-  | "input"
-  | "unknown";
+  "network" | "http" | "parse" | "validation" | "token" | "input" | "unknown";
 
 export interface GameCoreError {
   kind: ErrorKind;
@@ -47,8 +41,7 @@ export interface GameCoreError {
 }
 
 export type Outcome<T> =
-  | { ok: true; data: T }
-  | { ok: false; error: GameCoreError };
+  { ok: true; data: T } | { ok: false; error: GameCoreError };
 
 export interface HttpConfig {
   baseUrl: string;

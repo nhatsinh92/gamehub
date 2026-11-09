@@ -2,7 +2,12 @@
 import { describe, expect, test } from "vitest";
 import { RemoteAdapter } from "./remote-adapter.ts";
 import type { TrackingEvent } from "./types.ts";
-import { TOKEN, fakeFetch, jsonResponse, renderGameContext } from "./test-helpers.ts";
+import {
+  TOKEN,
+  fakeFetch,
+  jsonResponse,
+  renderGameContext,
+} from "./test-helpers.ts";
 
 const NULLS = {
   config: null,

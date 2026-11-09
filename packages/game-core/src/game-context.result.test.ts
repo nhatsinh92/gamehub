@@ -63,8 +63,22 @@ describe("submitResult", () => {
 
   test.each([
     [{ status: "ERROR", isWin: false, remainingTurns: 3, message: "Oops" }],
-    [{ status: "OUT_OF_TURN", isWin: false, remainingTurns: 0, message: "No turns" }],
-    [{ status: "MAINTENANCE", isWin: false, remainingTurns: 3, message: "Maintenance" }],
+    [
+      {
+        status: "OUT_OF_TURN",
+        isWin: false,
+        remainingTurns: 0,
+        message: "No turns",
+      },
+    ],
+    [
+      {
+        status: "MAINTENANCE",
+        isWin: false,
+        remainingTurns: 3,
+        message: "Maintenance",
+      },
+    ],
   ])("[002:FR-015] shows the server result as is: %j", async (result) => {
     const { ctx } = setup(result);
     await ctx.run((c) => c.submitResult(10));
