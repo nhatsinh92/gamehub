@@ -35,10 +35,13 @@ jobs:
       REVIEW_MODEL: claude-sonnet-5-5
       # Same tools for build and fix. No `git push`, no network tools: the
       # workflow pushes, and Claude never sees a GitHub token.
-      # Plain `pwsh`: a narrower prefix blocked the speckit scripts (issue #18),
-      # and `node` already runs any code, so it adds no risk.
+      # Speckit skills run their scripts by path (`.specify/scripts/powershell/x.ps1 -Json`),
+      # not via `pwsh`; without the path entries every script call was denied (issue #18).
+      # The scripts are executable with a pwsh shebang. `node` already runs any
+      # code, so these entries add no risk.
       WRITE_TOOLS: >-
         Skill,Read,Write,Edit,Glob,Grep,Bash(pwsh:*),Bash(pnpm:*),Bash(node:*),
+        Bash(.specify/scripts/powershell/:*),Bash(./.specify/scripts/powershell/:*),
         Bash(git add:*),Bash(git commit:*),Bash(git status:*),Bash(git diff:*),Bash(git log:*)
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

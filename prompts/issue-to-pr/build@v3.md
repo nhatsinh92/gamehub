@@ -36,8 +36,10 @@ the `guard-deps` gate blocks the merge.
 
 ## Steps
 
-This runs on Linux: call speckit scripts as
-`pwsh -File .specify/scripts/powershell/<name>.ps1 …`.
+Use the speckit skills (Skill tool) and run their scripts exactly as each skill
+says; they work on this Linux runner. Never write spec, plan or tasks by hand to
+work around a skill or script that fails: print `ABORT: speckit <skill> failed:
+<error>` instead, so the workflow can be fixed.
 
 ### Phase `spec`
 
