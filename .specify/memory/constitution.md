@@ -1,7 +1,7 @@
 <!--
 Sync Impact Report
-- Version change: 1.0.1 → 1.1.0 (MINOR)
-- Modified principles: IV. Simplicity — the reason for a new dependency, service or abstraction may also be recorded in the PR description when the change is exempt from a spec under Principle I (such changes have no plan). Guidance materially expanded; no rule removed.
+- Version change: 1.1.0 → 1.2.0 (MINOR)
+- Modified principles: I. Spec-First — spike code may be merged into the `dev` sandbox branch (hosted as Storybook); it still MUST NOT reach `main`. Guidance materially expanded; no rule removed.
 - Added sections: none
 - Removed sections: none
 - Templates: no update needed
@@ -16,7 +16,7 @@ Sync Impact Report
 
 - Every behavior change MUST start from an approved spec.
 - Every spec change MUST bump the spec's Version and add a Changelog entry.
-- Exempt: tooling/infra changes with no user-facing behavior, and spikes. Spike code MUST be discarded before merge.
+- Exempt: tooling/infra changes with no user-facing behavior, and spikes. Spike code MUST NOT reach `main`; it MAY be merged only into `dev`, a sandbox branch that is never merged into `main`.
 
 Rationale: the spec is the source of truth; code without a spec cannot be reviewed for intent.
 
@@ -65,4 +65,4 @@ GameHub is a repository of HTML5 mini-games.
 - A deviation from any principle is allowed only if it is recorded in the plan's Complexity Tracking table.
 - Growth rule: when the same defect type is found twice in review, or the same instruction has to be given to the AI twice, it MUST be turned into a rule (a lint or CI check preferred over prose) and the MINOR version bumped.
 
-**Version**: 1.1.0 | **Ratified**: 2026-11-04 | **Last Amended**: 2026-11-05
+**Version**: 1.2.0 | **Ratified**: 2026-11-04 | **Last Amended**: 2026-11-10
