@@ -4,9 +4,9 @@
 
 **Created**: 2026-11-10
 
-**Status**: Draft
+**Status**: Implemented
 
-**Version**: 0.1.0
+**Version**: 1.0.0
 
 **Input**: User description: GitHub issue #30. The first game made with `pnpm gen-game`. It proves the whole path, from template to playable embedded game, and becomes the example of a real game (not a template) that later games follow. Gameplay: a bird falls under gravity and flaps up on each tap or Space press, through pairs of pipes that scroll from right to left with a random vertical gap; one point per pair passed; game over on hitting a pipe, the ground or the top edge; difficulty grows with the score within limits; the result is submitted to the server and shown the way the template does. The game advances in fixed time steps, its logic is pure and seeded, it pauses while hidden, and it draws on a canvas with the device pixel ratio capped at 2. The issue names the game after an existing commercial game; this spec uses the original name `sky-hopper` instead (Assumption 1).
 
@@ -193,4 +193,5 @@ Other defaults:
 
 ## Changelog
 
+- 1.0.0 (2026-11-10): approved by the owner by merging the PR; Status → Implemented (issue #30).
 - 0.1.0 (2026-11-10): initial draft from issue #30.
