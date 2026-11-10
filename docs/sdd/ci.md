@@ -51,7 +51,7 @@ Add the `ai-build` label to an issue → speckit specify → plan → tasks → 
 | Decision | Why |
 |---|---|
 | Starts only on a label | Adding a label needs triage rights; opening an issue does not. A stranger's issue cannot spend tokens or open PRs |
-| Checkout without credentials; tokens only in the steps that push/comment; Claude has no `git push`, `gh` or network tools | The issue text is untrusted; a prompt injection in it cannot push or read a GitHub token |
+| Two jobs: `build` (Claude, gates; `contents: read`, `issues: read`, no `AI_BOT_TOKEN`) hands a `git bundle` and its files to `publish` (checkout of `main`, push, PR, comments), which runs no code Claude changed and treats the bundle, files and outputs as data | The issue text is untrusted, and code Claude writes runs in the gates. Within one job, steps are not isolated: a step can set `BASH_ENV` or `PATH` for later steps (`$GITHUB_ENV`, `$GITHUB_PATH`), change `.git/config` hooks or a script a later step runs, or read every secret the job references from runner memory. So a write token in a later step of the same job is reachable |
 | Reviewer is a new read-only session each round | It does not grade its own fix and cannot edit to pass |
 | Two build sessions: spec phase (`SPEC_MODEL`), implement and fix (`CODE_MODEL`), review (`REVIEW_MODEL`), all on Sonnet; 1 fix round (`MAX_FIX_ROUNDS`); no AI review while gates fail; reviewer gets `diff.patch` and `commits.txt` (no git tools) | The spec phase on Opus was 58% of a run's cost (PR #31, $2.18 of $3.75); `SPEC_MODEL` stays separate so it can go back to Opus alone. A review of red gates only repeats the log. Reading one diff file costs fewer turns than exploring with git. Each round costs a review + a fix; past one round the reviewer usually repeats itself |
 | Existing `ai/issue-N` branch → fail | A re-run never overwrites a branch a human may have edited |
@@ -64,7 +64,7 @@ Add the `ai-build` label to an issue → speckit specify → plan → tasks → 
 | `ABORT` instead of guessing when the issue is vague or needs a protected path | CODEOWNERS paths need the owner first |
 | New dependencies allowed, with the reason in `plan.md`; PR body and issue comment flag them; `guard-deps` blocks merge until the owner adds `deps-approved` | Principle IV (reason in the plan, owner approves) without throwing away a whole run; the reviewer fails a dependency with no reason or one the standard library covers |
 
-**Known limits:** the spec is still Draft (0.1.0) when code is written. Principle I asks for an approved spec first, so the owner approves spec and code together in the PR; split into two runs (stop after `speckit-analyze`, continue on a `spec-approved` label) if that is not acceptable. `Bash(pnpm:*)` can run any package script, so `CLAUDE_CODE_OAUTH_TOKEN` is reachable from code Claude writes or from a package it adds (when that code runs in tests).
+**Known limits:** the spec is still Draft (0.1.0) when code is written. Principle I asks for an approved spec first, so the owner approves spec and code together in the PR; split into two runs (stop after `speckit-analyze`, continue on a `spec-approved` label) if that is not acceptable. `Bash(pnpm:*)` can run any package script, so `CLAUDE_CODE_OAUTH_TOKEN` is reachable from code Claude writes or from a package it adds (when that code runs in tests). Code in `build` can also write to the Actions cache of `main` (`setup-node` pnpm cache) and replace the artifact `publish` reads; `publish` uses no cache and only reads the artifact as data.
 
 ## AI spike: issue-to-spike
 
@@ -83,10 +83,11 @@ For trying many game ideas cheaply. Add the `ai-spike` label to an issue → one
 | Next spike started with `AI_BOT_TOKEN` | A label added with `GITHUB_TOKEN` starts no workflow |
 | Gates reported in the comment, not blocking for the spike branch; partial work pushed on failure | A failed run's work is cheaper to look at than to redo |
 | Merge into `dev` only if the game's gates pass and the Storybook app still builds on the merge | All stories share one bundle: one broken game would blank the whole hosted Storybook |
+| `build` merges and builds; `publish` pushes `dev` only after a guard: the spike changes only a new `apps/<name>/`, its story and `pnpm-lock.yaml`; the merge commit equals `git merge-tree` of `dev` and the spike (lockfile aside); `apps/<name>/package.json` equals the template's except the name; outside `importers:` the lockfile equals `dev`'s or `main`'s | `dev` has no review, so the prompt's file rules were the only check, and the lockfile rebuild accepted any new dependency. The merge, `pnpm install` and the Storybook build run spike code, so they cannot hold the token |
 | After the merge, `pnpm-lock.yaml` is always rebuilt from `dev`'s copy with `pnpm install`; a conflict in any other file fails the merge | Every spike adds a lockfile importer block, and git's text merge of the lockfile can succeed yet leave it broken (spike 34); a hand-merged code conflict is not worth guessing |
 | No new dependencies (`ABORT`) | No plan to record the reason in (Principle IV) |
 
-**Known limits:** a batch started while a spike run is queued (not yet running) can start a second chain; start batches when no spike is running. `spike/*` branches are not deleted automatically. `dev` is not synced with `main` automatically: merge `main` into `dev` when `game-core` or the template changes, or older spikes may stop building.
+**Known limits:** a batch started while a spike run is queued (not yet running) can start a second chain; start batches when no spike is running. `spike/*` branches are not deleted automatically. `dev` is not synced with `main` automatically: merge `main` into `dev` when `game-core` or the template changes, or older spikes may stop building; when `main` and `dev` differ in third-party packages, the dev guard fails until they are synced.
 
 ## Adding a gate
 

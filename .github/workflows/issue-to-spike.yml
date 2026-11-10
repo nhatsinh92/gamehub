@@ -1,8 +1,12 @@
 # AI spike: issue (a game idea) -> one Sonnet session -> playable game pushed to
-# `spike/issue-N`. No spec, no review, no PR: a spike is never merged
-# (constitution Principle I). Starts when someone with triage rights adds the
-# `ai-spike` label; when a run ends it starts the oldest `ai-spike-queue` issue.
-# See docs/sdd/ci.md#ai-spike-issue-to-spike.
+# `spike/issue-N`, and merged into the `dev` sandbox branch (never into `main`,
+# constitution Principle I). No spec, no review, no PR. Starts when someone with
+# triage rights adds the `ai-spike` label; when a run ends it starts the oldest
+# `ai-spike-queue` issue. See docs/sdd/ci.md#ai-spike-issue-to-spike.
+#
+# Two jobs: `build` runs Claude and the code it writes and never sees a write
+# token; `publish` holds AI_BOT_TOKEN, runs no repo code changed by Claude, and
+# treats everything `build` hands over (bundles, files, outputs) as untrusted data.
 name: issue-to-spike
 
 on:
@@ -18,18 +22,26 @@ concurrency:
   group: ai-spike
   cancel-in-progress: false
 
+env:
+  ISSUE: ${{ github.event.issue.number }}
+  BRANCH: spike/issue-${{ github.event.issue.number }}
+  SENDER: ${{ github.event.sender.login }}
+
 jobs:
-  spike:
+  build:
     if: github.event.label.name == 'ai-spike'
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    # Read-only: code in this job can read any token the job holds (env, $GITHUB_ENV,
+    # runner memory), so no write token is ever referenced here.
     permissions:
       contents: read
-      issues: write
+      issues: read
+    outputs:
+      name: ${{ steps.build.outputs.name }}
+      gates: ${{ steps.gates.outputs.gates }}
+      dev: ${{ steps.dev.outputs.ready }}
     env:
-      ISSUE: ${{ github.event.issue.number }}
-      BRANCH: spike/issue-${{ github.event.issue.number }}
-      SENDER: ${{ github.event.sender.login }}
       MODEL: claude-sonnet-5-5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -44,9 +56,9 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: npm install -g @anthropic-ai/claude-code@2.1.318
 
-      - name: Prepare (issue text, branch)
+      - name: Prepare (issue text, branch, dev)
         env:
-          GH_TOKEN: ${{ secrets.AI_BOT_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           AI="$RUNNER_TEMP/ai"
           echo "AI=$AI" >> "$GITHUB_ENV"
@@ -58,6 +70,7 @@ jobs:
           fi
           # Issue text goes to a file, never into a shell command (script injection).
           gh issue view "$ISSUE" --json title,body --jq '"# " + .title + "\n\n" + .body' > "$AI/issue.md"
+          git fetch -q origin dev
           git config user.name "gamehub-ai"
           git config user.email "gamehub-ai@users.noreply.github.com"
           git checkout -b "$BRANCH"
@@ -90,28 +103,14 @@ jobs:
           then echo "gates=pass" >> "$GITHUB_OUTPUT"
           else echo "gates=fail" >> "$GITHUB_OUTPUT"; tail -n 60 "$AI/gates.log"; fi
 
-      - name: Push
-        id: push
-        if: always() && env.BASE_SHA != ''
-        env:
-          GH_TOKEN: ${{ secrets.AI_BOT_TOKEN }}
-        run: |
-          [ "$(git rev-list --count "$BASE_SHA"..HEAD)" != 0 ] || exit 0
-          for i in 1 2 3; do
-            git push origin "HEAD:refs/heads/$BRANCH" && { echo "pushed=true" >> "$GITHUB_OUTPUT"; break; }
-            [ "$i" = 3 ] && exit 1
-            sleep $((i * 30))
-          done
-
       # All stories share one Storybook bundle, so a game that breaks it must not reach `dev`.
+      # Merged here, pushed by `publish` after its guard.
       - name: Merge into dev (Storybook)
         id: dev
-        if: steps.gates.outputs.gates == 'pass' && steps.push.outputs.pushed == 'true'
+        if: steps.gates.outputs.gates == 'pass'
         env:
-          GH_TOKEN: ${{ secrets.AI_BOT_TOKEN }} # a push by this token starts deploy-storybook
           NAME: ${{ steps.build.outputs.name }}
         run: |
-          git fetch -q origin dev
           git checkout -q -B dev origin/dev
           if ! git merge --no-ff --no-commit "$BRANCH"; then
             # shortcut: only the lockfile may conflict (rebuilt below); upgrade if other files start to conflict
@@ -125,11 +124,112 @@ jobs:
           git commit -q -m "spike: merge $NAME (#$ISSUE)"
           pnpm turbo run lint check-types build --filter=storybook > "$AI/storybook.log" 2>&1 \
             || { tail -n 60 "$AI/storybook.log"; exit 1; }
-          git push origin dev
+          git bundle create "$AI/dev.bundle" dev ^origin/dev
+          echo "ready=true" >> "$GITHUB_OUTPUT"
+
+      - name: Bundle the spike branch
+        if: always() && env.BASE_SHA != ''
+        run: |
+          [ "$(git rev-list --count "$BASE_SHA..$BRANCH")" = 0 ] || git bundle create "$AI/spike.bundle" "$BRANCH" "^$BASE_SHA"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always() && env.AI != ''
+        with:
+          name: spike-issue-${{ github.event.issue.number }}
+          path: |
+            ${{ runner.temp }}/ai/spike.bundle
+            ${{ runner.temp }}/ai/dev.bundle
+            ${{ runner.temp }}/ai/build.md
+            ${{ runner.temp }}/ai/usage.tsv
+          if-no-files-found: ignore
+          retention-days: 7
+
+  publish:
+    needs: build
+    if: always() && needs.build.result != 'skipped'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      issues: write
+    env:
+      GATES: ${{ needs.build.outputs.gates }}
+    steps:
+      # `main` as of the event, not anything `build` produced: the scripts run below are trusted.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        continue-on-error: true # no artifact when `build` failed before Prepare
+        with:
+          name: spike-issue-${{ github.event.issue.number }}
+          path: ${{ runner.temp }}/ai
+      - name: Read build outputs
+        env:
+          RAW_NAME: ${{ needs.build.outputs.name }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/ai"
+          echo "AI=$RUNNER_TEMP/ai" >> "$GITHUB_ENV"
+          # Outputs of `build` are untrusted: the name is used in paths, regexes and URLs.
+          [[ "$RAW_NAME" =~ ^[a-z0-9][a-z0-9-]*$ ]] && echo "NAME=$RAW_NAME" >> "$GITHUB_ENV" || true
+
+      - name: Push
+        id: push
+        env:
+          GH_TOKEN: ${{ secrets.AI_BOT_TOKEN }}
+        run: |
+          [ -f "$AI/spike.bundle" ] || exit 0 # no commits
+          gh auth setup-git
+          git fetch -q "$AI/spike.bundle" "$BRANCH:$BRANCH"
+          for i in 1 2 3; do
+            git push origin "$BRANCH:refs/heads/$BRANCH" && { echo "pushed=true" >> "$GITHUB_OUTPUT"; break; }
+            [ "$i" = 3 ] && exit 1
+            sleep $((i * 30))
+          done
+
+      # dev has no review, so the prompt's file rules are enforced here: the spike
+      # changes only a new game's folder, its story and the lockfile; the merge commit
+      # `build` made is a plain merge of it (lockfile aside); package.json is as
+      # generated; the lockfile adds no third-party package.
+      - name: Guard and push dev
+        id: dev
+        if: env.NAME != '' && needs.build.outputs.dev == 'true' && steps.push.outputs.pushed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.AI_BOT_TOKEN }} # a push by this token starts deploy-storybook
+        run: |
+          fail() { echo "::error::dev guard: $1"; exit 1; }
+          git fetch -q origin dev
+          git fetch -q "$AI/dev.bundle" "dev:spike-dev" || fail "dev moved since the build; re-run the spike"
+          [ "$(git rev-parse spike-dev^1)" = "$(git rev-parse origin/dev)" ] || fail "merge parent is not dev's tip"
+          [ "$(git rev-parse spike-dev^2)" = "$(git rev-parse "$BRANCH")" ] || fail "merge does not merge $BRANCH"
+          for rev in "$GITHUB_SHA" origin/dev; do
+            ! git cat-file -e "$rev:apps/$NAME" 2>/dev/null || fail "apps/$NAME already exists"
+          done
+          # Against main (the spike's base), not dev: dev may lag main, and main's commits come along.
+          other=$(git diff --name-only "$GITHUB_SHA" "$BRANCH" \
+            | grep -vE "^(apps/$NAME/.*|apps/storybook/src/stories/$NAME\.stories\.tsx|pnpm-lock\.yaml)$" || true)
+          [ -z "$other" ] || fail "spike changes files outside apps/$NAME and its story: $(echo $other)"
+          tree=$(git merge-tree --write-tree origin/dev "$BRANCH" | head -n 1)
+          other=$(git diff --name-only "$tree" spike-dev | grep -vx pnpm-lock.yaml || true)
+          [ -z "$other" ] || fail "merge commit differs from a plain merge: $(echo $other)"
+          # Same as the template except the name: no new dependency, no new (lifecycle) script.
+          node -e '
+            const [a, b] = process.argv.slice(1).map((s) => { const p = JSON.parse(s); delete p.name; return JSON.stringify(p); });
+            if (a !== b) process.exit(1);' \
+            "$(git show "spike-dev:apps/$NAME/package.json")" \
+            "$(git show "$GITHUB_SHA:apps/scratch-card-example/package.json")" \
+            || fail "apps/$NAME/package.json differs from the template beyond its name"
+          # Only `importers:` may change: a new package would show in `packages:`/`snapshots:`.
+          # shortcut: when main and dev differ in third-party packages, this fails until main is merged into dev.
+          strip() { git show "$1:pnpm-lock.yaml" | awk '/^importers:/ { s = 1; next } /^[a-z]/ { s = 0 } !s'; }
+          new=$(strip spike-dev)
+          [ "$new" = "$(strip origin/dev)" ] || [ "$new" = "$(strip "$GITHUB_SHA")" ] \
+            || fail "pnpm-lock.yaml adds or changes third-party packages (or main changed dependencies: merge main into dev)"
+          git push origin "spike-dev:refs/heads/dev"
           echo "merged=true" >> "$GITHUB_OUTPUT"
 
       - name: Usage summary
-        if: always() && env.AI != ''
+        if: always()
         run: |
           { echo "## Claude usage (spike, issue #$ISSUE)"; echo; .github/scripts/usage-table.sh; } >> "$GITHUB_STEP_SUMMARY"
 
@@ -137,8 +237,6 @@ jobs:
         if: always()
         env:
           GH_TOKEN: ${{ github.token }} # posted by github-actions[bot], so the @mention notifies
-          NAME: ${{ steps.build.outputs.name }}
-          GATES: ${{ steps.gates.outputs.gates }}
           PUSHED: ${{ steps.push.outputs.pushed }}
           MERGED: ${{ steps.dev.outputs.merged }}
         run: |
@@ -148,7 +246,7 @@ jobs:
               site="https://${GITHUB_REPOSITORY_OWNER,,}.github.io/${GITHUB_REPOSITORY#*/}/?path=/story/$NAME--default"
               where="Merged into \`dev\`; once Pages deploys (a few minutes) play it at $site"
             else
-              where="Not merged into \`dev\` (gates: $GATES, or the merge/Storybook build failed; see the run)."
+              where="Not merged into \`dev\` (gates: $GATES, or the merge, the Storybook build or the dev guard failed; see the run)."
             fi
             msg="@$SENDER Spike \`$NAME\` is on branch \`$BRANCH\` (gates: $GATES). $where
           Or locally: \`git fetch origin $BRANCH && git checkout $BRANCH && pnpm install && pnpm --filter $NAME dev\`

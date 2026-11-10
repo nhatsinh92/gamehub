@@ -2,6 +2,10 @@
 # loop (max 3 fixes) -> PR -> notify a human to merge. AI never merges
 # (constitution Principle II). Starts only when someone with triage rights adds
 # the `ai-build` label to an issue. See docs/sdd/ci.md#ai-pipeline-issue-to-pr.
+#
+# `build` runs Claude and the code it writes and never sees a write token;
+# `publish` holds AI_BOT_TOKEN, runs no repo code changed by Claude, and treats
+# everything `build` hands over (bundle, files, outputs) as untrusted data.
 name: issue-to-pr
 
 on:
@@ -15,19 +19,40 @@ concurrency:
   group: issue-to-pr-${{ github.event.issue.number }}
   cancel-in-progress: false
 
+env:
+  ISSUE: ${{ github.event.issue.number }}
+  BRANCH: ai/issue-${{ github.event.issue.number }}
+  SENDER: ${{ github.event.sender.login }}
+  MAX_FIX_ROUNDS: 1
+
 jobs:
-  build:
+  start:
     if: github.event.label.name == 'ai-build'
     runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue comment "$ISSUE" --repo "$GITHUB_REPOSITORY" \
+            --body "AI pipeline started: speckit → code → review/fix (max $MAX_FIX_ROUNDS). Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+
+  build:
+    needs: start
+    runs-on: ubuntu-latest
     timeout-minutes: 120
+    # Read-only: code in this job can read any token the job holds (env, $GITHUB_ENV,
+    # runner memory), so no write token is ever referenced here.
     permissions:
       contents: read
-      issues: write # status comments and labels on the issue
+      issues: read
+    outputs:
+      aborted: ${{ steps.build.outputs.aborted }}
+      result: ${{ steps.loop.outputs.result }}
+      fixes: ${{ steps.loop.outputs.fixes }}
+      kept: ${{ steps.keep.outputs.artifact-url }}
     env:
-      ISSUE: ${{ github.event.issue.number }}
-      BRANCH: ai/issue-${{ github.event.issue.number }}
-      SENDER: ${{ github.event.sender.login }}
-      MAX_FIX_ROUNDS: 1
       # Must match the `verify` job in pr.yml, or a PR that passes here fails CI.
       GATES: lint check-types test buildSdk
       # Sonnet everywhere: Opus on the spec phase was 58% of a run's cost (PR #31).
@@ -59,10 +84,9 @@ jobs:
       # Exact version: CI tool, not a project dependency (no lockfile change).
       - run: npm install -g @anthropic-ai/claude-code@2.1.318
 
-      - name: Prepare (issue text, branch, start comment)
+      - name: Prepare (issue text, branch)
         env:
-          GH_TOKEN: ${{ secrets.AI_BOT_TOKEN }}
-          ACTIONS_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           # runner.temp is not available in job-level env, so AI is set here.
           AI="$RUNNER_TEMP/ai"
@@ -80,8 +104,6 @@ jobs:
           git config user.email "gamehub-ai@users.noreply.github.com"
           git checkout -b "$BRANCH"
           echo "BASE_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
-          GH_TOKEN="$ACTIONS_TOKEN" gh issue comment "$ISSUE" \
-            --body "AI pipeline started: speckit → code → review/fix (max $MAX_FIX_ROUNDS). Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
 
       - name: Build (spec phase on SPEC_MODEL, implement phase on CODE_MODEL)
         id: build
@@ -174,24 +196,70 @@ jobs:
           git show HEAD~1:"$spec" > "$AI/old-spec.md"
           node packages/spec-diff/src/cli.ts "$AI/old-spec.md" "$spec"
 
+      # `publish` pushes from this bundle. On a failure it also keeps Claude's
+      # commits, so a human can push them instead of paying for a new run.
+      - name: Bundle work
+        if: always() && env.BASE_SHA != ''
+        run: git bundle create "$AI/work.bundle" "$BASE_SHA..$BRANCH" || echo "No commits to keep."
+      - name: Upload work
+        id: keep
+        if: always() && env.BASE_SHA != ''
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ai-issue-${{ github.event.issue.number }}
+          path: |
+            ${{ runner.temp }}/ai/work.bundle
+            ${{ runner.temp }}/ai/build.md
+            ${{ runner.temp }}/ai/review.md
+            ${{ runner.temp }}/ai/issue.md
+            ${{ runner.temp }}/ai/usage.tsv
+            ${{ runner.temp }}/ai/*.json
+          if-no-files-found: ignore
+          retention-days: 7
+
+  publish:
+    needs: build
+    if: always() && needs.build.result != 'skipped'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      issues: write # comments and labels on the issue
+    steps:
+      # `main` as of the event, not anything `build` produced: the scripts run below are trusted.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        continue-on-error: true # no artifact when `build` failed before Prepare
+        with:
+          name: ai-issue-${{ github.event.issue.number }}
+          path: ${{ runner.temp }}/ai
+      - run: |
+          mkdir -p "$RUNNER_TEMP/ai"
+          echo "AI=$RUNNER_TEMP/ai" >> "$GITHUB_ENV"
+
       - name: Push and open PR
         id: pr
-        if: steps.build.outputs.aborted != 'true'
+        if: needs.build.result == 'success' && needs.build.outputs.aborted != 'true'
         env:
           # A PAT/App token, not GITHUB_TOKEN: a PR opened by GITHUB_TOKEN does
           # not trigger pr.yml, so the required checks would never run.
           GH_TOKEN: ${{ secrets.AI_BOT_TOKEN }}
-          RESULT: ${{ steps.loop.outputs.result }}
-          FIXES: ${{ steps.loop.outputs.fixes }}
+          RESULT: ${{ needs.build.outputs.result }}
+          FIXES: ${{ needs.build.outputs.fixes }}
         run: |
+          gh auth setup-git
+          git fetch -q "$AI/work.bundle" "$BRANCH:$BRANCH"
           # Retry: GitHub sometimes rejects with "fatal error in commit_refs" (issue #18).
           for i in 1 2 3; do
-            git push origin "HEAD:refs/heads/$BRANCH" && break
+            git push origin "$BRANCH:refs/heads/$BRANCH" && break
             [ "$i" = 3 ] && exit 1
             sleep $((i * 30))
           done
           deps=false
-          git diff --quiet "$BASE_SHA" HEAD -- pnpm-lock.yaml || deps=true
+          git diff --quiet "$GITHUB_SHA" "$BRANCH" -- pnpm-lock.yaml || deps=true
           echo "deps=$deps" >> "$GITHUB_OUTPUT"
           {
             echo "Closes #$ISSUE"
@@ -204,7 +272,7 @@ jobs:
               echo "Reasons are in \`plan.md\` under \`## New dependencies\`. Add the \`deps-approved\` label to approve; \`guard-deps\` blocks the merge until then."
               echo
               echo '```diff'
-              git diff "$BASE_SHA" HEAD -- '*package.json' | grep -E '^[+-] ' || true
+              git diff "$GITHUB_SHA" "$BRANCH" -- '*package.json' | grep -E '^[+-] ' || true
               echo '```'
               echo
             fi
@@ -224,27 +292,8 @@ jobs:
             --title "$(head -n 1 "$AI/issue.md" | sed 's/^# //') (#$ISSUE)" --body-file "$AI/pr-body.md")
           echo "url=$url" >> "$GITHUB_OUTPUT"
 
-      # On any failure after the branch was created, keep Claude's commits so a
-      # human can push them instead of paying for a new run.
-      - name: Bundle work on failure
-        if: failure() && env.BASE_SHA != ''
-        run: git bundle create "$AI/work.bundle" "$BASE_SHA..$BRANCH" || echo "No commits to keep."
-      - name: Upload work on failure
-        id: keep
-        if: failure() && env.BASE_SHA != ''
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: ai-issue-${{ github.event.issue.number }}
-          path: |
-            ${{ runner.temp }}/ai/work.bundle
-            ${{ runner.temp }}/ai/build.md
-            ${{ runner.temp }}/ai/review.md
-            ${{ runner.temp }}/ai/usage.tsv
-          if-no-files-found: ignore
-          retention-days: 7
-
       - name: Usage summary
-        if: always() && env.AI != ''
+        if: always()
         run: |
           { echo "## Claude usage (issue #$ISSUE)"; echo; .github/scripts/usage-table.sh; } >> "$GITHUB_STEP_SUMMARY"
 
@@ -252,18 +301,18 @@ jobs:
         if: always()
         env:
           GH_TOKEN: ${{ github.token }} # posted by github-actions[bot], so the @mention notifies
-          ABORTED: ${{ steps.build.outputs.aborted }}
-          RESULT: ${{ steps.loop.outputs.result }}
+          ABORTED: ${{ needs.build.outputs.aborted }}
+          RESULT: ${{ needs.build.outputs.result }}
           PR_URL: ${{ steps.pr.outputs.url }}
           DEPS: ${{ steps.pr.outputs.deps }}
-          KEPT_URL: ${{ steps.keep.outputs.artifact-url }}
-          JOB_STATUS: ${{ job.status }}
+          KEPT_URL: ${{ needs.build.outputs.kept }}
+          BUILD_RESULT: ${{ needs.build.result }}
         run: |
           run="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
           if [ "$ABORTED" = true ]; then
             msg="@$SENDER AI pipeline stopped without a PR: $(tail -n 1 "$AI/build.md" 2>/dev/null). Run: $run"
             gh issue edit "$ISSUE" --add-label ai-needs-human || true
-          elif [ "$JOB_STATUS" != success ] || [ -z "$PR_URL" ]; then
+          elif [ "$BUILD_RESULT" != success ] || [ -z "$PR_URL" ]; then
             msg="@$SENDER AI pipeline failed. Run: $run"
             limit=$(grep -h -m1 "hit your .*limit" "$AI"/*.md "$AI"/*.json 2>/dev/null | head -n 1)
             [ -n "$limit" ] && msg="$msg
