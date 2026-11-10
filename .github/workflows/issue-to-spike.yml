@@ -103,6 +103,30 @@ jobs:
             sleep $((i * 30))
           done
 
+      # All stories share one Storybook bundle, so a game that breaks it must not reach `dev`.
+      - name: Merge into dev (Storybook)
+        id: dev
+        if: steps.gates.outputs.gates == 'pass' && steps.push.outputs.pushed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.AI_BOT_TOKEN }} # a push by this token starts deploy-storybook
+          NAME: ${{ steps.build.outputs.name }}
+        run: |
+          git fetch -q origin dev
+          git checkout -q -B dev origin/dev
+          if ! git merge --no-ff --no-commit "$BRANCH"; then
+            # shortcut: only the lockfile conflict is auto-resolved (pnpm regenerates it); upgrade if other files start to conflict
+            [ "$(git diff --name-only --diff-filter=U)" = pnpm-lock.yaml ] || { git merge --abort; exit 1; }
+            git checkout --ours pnpm-lock.yaml
+            pnpm install --no-frozen-lockfile
+            git add pnpm-lock.yaml
+          fi
+          git commit -q -m "spike: merge $NAME (#$ISSUE)"
+          pnpm install --frozen-lockfile
+          pnpm turbo run lint check-types build --filter=storybook > "$AI/storybook.log" 2>&1 \
+            || { tail -n 60 "$AI/storybook.log"; exit 1; }
+          git push origin dev
+          echo "merged=true" >> "$GITHUB_OUTPUT"
+
       - name: Usage summary
         if: always() && env.AI != ''
         run: |
@@ -115,12 +139,19 @@ jobs:
           NAME: ${{ steps.build.outputs.name }}
           GATES: ${{ steps.gates.outputs.gates }}
           PUSHED: ${{ steps.push.outputs.pushed }}
+          MERGED: ${{ steps.dev.outputs.merged }}
         run: |
           run="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
           if [ -n "$NAME" ] && [ "$PUSHED" = true ]; then
-            msg="@$SENDER Spike \`$NAME\` is on branch \`$BRANCH\` (gates: $GATES). To play:
-          \`git fetch origin $BRANCH && git checkout $BRANCH && pnpm install && pnpm --filter $NAME dev\`
-          Spikes are never merged: to keep the game, open an \`ai-build\` issue for it. Run: $run"
+            if [ "$MERGED" = true ]; then
+              site="https://${GITHUB_REPOSITORY_OWNER,,}.github.io/${GITHUB_REPOSITORY#*/}/?path=/story/$NAME--default"
+              where="Merged into \`dev\`; once Pages deploys (a few minutes) play it at $site"
+            else
+              where="Not merged into \`dev\` (gates: $GATES, or the merge/Storybook build failed; see the run)."
+            fi
+            msg="@$SENDER Spike \`$NAME\` is on branch \`$BRANCH\` (gates: $GATES). $where
+          Or locally: \`git fetch origin $BRANCH && git checkout $BRANCH && pnpm install && pnpm --filter $NAME dev\`
+          Spikes never reach \`main\`: to keep the game, open an \`ai-build\` issue for it. Run: $run"
           else
             msg="@$SENDER Spike stopped: $(tail -n 1 "$AI/build.md" 2>/dev/null). Partial work (if any) is on \`$BRANCH\`. Run: $run"
             gh issue edit "$ISSUE" --add-label ai-needs-human || true
