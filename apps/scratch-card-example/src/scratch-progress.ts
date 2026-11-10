@@ -8,23 +8,29 @@ export type ScratchGrid = {
 };
 
 export function createScratchGrid(size: number = GRID_SIZE): ScratchGrid {
-  void size;
-  return { size: 0, cells: [] };
+  return { size, cells: Array<boolean>(size * size).fill(false) };
 }
 
+/** x, y are card coordinates in 0..1; returns a new grid. */
 export function scratchAt(
   grid: ScratchGrid,
   x: number,
   y: number,
   radius: number = BRUSH_RADIUS,
 ): ScratchGrid {
-  void x;
-  void y;
-  void radius;
-  return grid;
+  if (x < 0 || x > 1 || y < 0 || y > 1) return grid;
+  const { size } = grid;
+  const cells = grid.cells.map((marked, i) => {
+    if (marked) return true;
+    const cx = ((i % size) + 0.5) / size;
+    const cy = (Math.floor(i / size) + 0.5) / size;
+    return Math.hypot(cx - x, cy - y) <= radius;
+  });
+  return { size, cells };
 }
 
+/** Share of scratched cells, 0..1 (0 for an empty grid). */
 export function scratchProgress(grid: ScratchGrid): number {
-  void grid;
-  return 0;
+  if (grid.cells.length === 0) return 0;
+  return grid.cells.filter(Boolean).length / grid.cells.length;
 }
