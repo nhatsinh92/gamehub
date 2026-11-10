@@ -9,7 +9,7 @@ export const TEXT = {
   loading: "Loading…",
   loadError: "Could not load the game. Please try again later.",
   submitError: "Something went wrong. Please try again.",
-  hint: "Tap or press Space to start",
+  hint: "Tap or press Space to fly",
   playAgain: "Play again",
 } as const;
 
