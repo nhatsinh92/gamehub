@@ -10,7 +10,7 @@
     "allowImportingTsExtensions": true,
     "resolveJsonModule": true,
     "erasableSyntaxOnly": true,
-    "types": ["node"]
+    "types": ["node", "vite/client"]
   },
   "include": [
     "*.ts",

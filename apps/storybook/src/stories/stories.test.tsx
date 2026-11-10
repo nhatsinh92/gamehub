@@ -33,6 +33,7 @@ test("[006:FR-003] [006:FR-006] each story renders its game root, with the game 
   const seen: { title: string; roots: number; hasCss: boolean }[] = [];
   for (const name of names) {
     const mod = modules[`./${name}.stories.tsx`];
+    if (!mod) throw new Error(`missing story ${name}`);
     const div = document.createElement("div");
     document.body.appendChild(div);
     const root = createRoot(div);
