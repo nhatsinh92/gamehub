@@ -28,13 +28,13 @@ describe("names", () => {
   test("[003:FR-012] toSdkGlobalName table", () => {
     const table = [
       "scratch-card-example",
-      "lucky-wheel",
+      "foo-bar",
       "quiz",
       "a--b",
     ].map((n) => [n, toSdkGlobalName(n)]);
     expect(table).toEqual([
       ["scratch-card-example", "ScratchCardExampleSDK"],
-      ["lucky-wheel", "LuckyWheelSDK"],
+      ["foo-bar", "FooBarSDK"],
       ["quiz", "QuizSDK"],
       ["a--b", "ABSDK"],
     ]);
