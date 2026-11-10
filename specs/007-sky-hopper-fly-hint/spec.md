@@ -4,9 +4,9 @@
 
 **Created**: 2026-11-10
 
-**Status**: Draft
+**Status**: Implemented
 
-**Version**: 0.1.0
+**Version**: 1.0.0
 
 **Input**: User description: GitHub issue #43. In `sky-hopper`, the hint on the ready screen reads "Tap or press Space to start". Players do not learn that the same input makes the bird fly up during the round. Change the hint to "Tap or press Space to fly". Only the ready-screen hint text changes; no other behavior or layout. Update the UI contract in `specs/005-sky-hopper/contracts/game-ui.md` and the tests that assert the hint.
 
@@ -57,4 +57,5 @@ A player opens the game and sees the ready screen. The hint tells them that the 
 
 ## Changelog
 
+- 1.0.0 (2026-11-10): approved by the owner by merging the PR; Status → Implemented (issue #43).
 - 0.1.0 (2026-11-10): Draft from issue #43.
