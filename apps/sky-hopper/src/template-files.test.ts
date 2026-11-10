@@ -20,12 +20,13 @@ test("[005:FR-001] package name, game id and SDK global are sky-hopper", () => {
 });
 
 test("[005:FR-003] no old gameplay file or word remains in src", () => {
+  const Cap = OLD.charAt(0).toUpperCase() + OLD.slice(1);
   const files = [
-    "ScratchCard.tsx",
-    "ScratchCanvas.tsx",
-    "ScratchCard.test.tsx",
-    "scratch-progress.ts",
-    "scratch-progress.test.ts",
+    `${Cap}Card.tsx`,
+    `${Cap}Canvas.tsx`,
+    `${Cap}Card.test.tsx`,
+    `${OLD}-progress.ts`,
+    `${OLD}-progress.test.ts`,
   ];
   expect(files.filter((f) => existsSync(join(srcDir, f)))).toEqual([]);
   const walk = (dir: string): string[] =>

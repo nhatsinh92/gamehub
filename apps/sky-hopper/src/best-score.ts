@@ -1,3 +1,3 @@
-export function bestScore(_prev: number, _score: number): number {
-  return 0;
+export function bestScore(prev: number, score: number): number {
+  return Math.max(prev, score);
 }

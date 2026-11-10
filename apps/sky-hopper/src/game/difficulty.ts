@@ -1,8 +1,11 @@
 import type { GameConfig } from "./config.ts";
 
 export function difficulty(
-  _score: number,
-  _cfg: GameConfig,
+  score: number,
+  cfg: GameConfig,
 ): { speed: number; gap: number } {
-  return { speed: 0, gap: 0 };
+  return {
+    speed: Math.min(cfg.speedMax, cfg.speedStart + cfg.speedPerPoint * score),
+    gap: Math.max(cfg.gapMin, cfg.gapStart - cfg.gapPerPoint * score),
+  };
 }

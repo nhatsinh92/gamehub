@@ -78,8 +78,9 @@ test("[005:FR-010] score rises by 1 when the bird front passes the back edge, on
     {
       ...base,
       score: 1,
-      sinceSpawn: MOVE + MOVE,
-      pipes: [pipe({ x: 84.5 - MOVE - MOVE, scored: true })],
+      // the point raised the speed to 175 px/s
+      sinceSpawn: MOVE + 175 * DT,
+      pipes: [pipe({ x: 84.5 - MOVE - 175 * DT, scored: true })],
     },
   ]);
 });
