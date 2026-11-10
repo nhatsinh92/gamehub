@@ -114,14 +114,15 @@ jobs:
           git fetch -q origin dev
           git checkout -q -B dev origin/dev
           if ! git merge --no-ff --no-commit "$BRANCH"; then
-            # shortcut: only the lockfile conflict is auto-resolved (pnpm regenerates it); upgrade if other files start to conflict
+            # shortcut: only the lockfile may conflict (rebuilt below); upgrade if other files start to conflict
             [ "$(git diff --name-only --diff-filter=U)" = pnpm-lock.yaml ] || { git merge --abort; exit 1; }
-            git checkout --ours pnpm-lock.yaml
-            pnpm install --no-frozen-lockfile
-            git add pnpm-lock.yaml
           fi
+          # Git merges the lockfile as text, even without a conflict, and can leave it broken
+          # (ERR_PNPM_LOCKFILE_MISSING_DEPENDENCY, seen on spike 34): rebuild it from dev's copy.
+          git checkout HEAD -- pnpm-lock.yaml
+          pnpm install --no-frozen-lockfile
+          git add pnpm-lock.yaml
           git commit -q -m "spike: merge $NAME (#$ISSUE)"
-          pnpm install --frozen-lockfile
           pnpm turbo run lint check-types build --filter=storybook > "$AI/storybook.log" 2>&1 \
             || { tail -n 60 "$AI/storybook.log"; exit 1; }
           git push origin dev
