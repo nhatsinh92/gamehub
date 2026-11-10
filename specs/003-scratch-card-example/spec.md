@@ -4,9 +4,9 @@
 
 **Created**: 2026-11-10
 
-**Status**: Draft
+**Status**: Implemented
 
-**Version**: 0.1.0
+**Version**: 1.0.0
 
 **Input**: User description: GitHub issue #25 "scratch-card-example: the game template every new game is copied from". Every new game will start as a copy of this app (a generator script comes in a later issue), so whatever is in the template ends up in every game. The template must be small, correct, pass all repository checks on its own, and show the one right way for a game to use the shared game core package.
 
@@ -164,4 +164,5 @@ Other defaults:
 
 ## Changelog
 
+- 1.0.0 (2026-11-10): approved by the owner by merging the PR; Status → Implemented (issue #25).
 - 0.1.0 (2026-11-10): initial draft from issue #25.
