@@ -4,9 +4,9 @@
 
 **Created**: 2026-11-10
 
-**Status**: Draft
+**Status**: Implemented
 
-**Version**: 0.1.1
+**Version**: 1.0.0
 
 **Input**: User description: GitHub issue #35. A Storybook that serves as a sandbox for trying out the games in `apps/`. Each game is embedded in a story so a developer can play it in the browser without a host page or a backend. Two stories for now (`scratch-card-example`, `sky-hopper`), each rendering the game inside the shared game context with the local (offline) adapter and its mock data from `@repo/game-core`.
 
@@ -108,5 +108,6 @@ Out of scope (issue #35): controls for the game config, the current user or forc
 
 ## Changelog
 
+- 1.0.0 (2026-11-10): approved by the owner by merging the PR; Status → Implemented (issue #35).
 - 0.1.1 (2026-11-10): note that `pnpm-workspace.yaml` gets `allowBuilds: esbuild: false` (Storybook pulls in esbuild; pnpm 12 fails the install on unreviewed build scripts).
 - 0.1.0 (2026-11-10): initial draft from issue #35.
