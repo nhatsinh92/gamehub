@@ -25,7 +25,7 @@ const text = (c: HTMLElement, sel: string) =>
   c.querySelector(sel)?.textContent ?? null;
 
 describe("screens", () => {
-  test("[005:FR-021] loading text, then the ready screen", async () => {
+  test("[005:FR-021][007:FR-001] loading text, then the ready screen", async () => {
     const fake = fakeAdapter({ holdConfig: true });
     const view = renderApp(fake);
     unmount = view.unmount;
@@ -41,7 +41,7 @@ describe("screens", () => {
       text(view.container, ".score"),
       view.container.querySelectorAll("canvas.play").length,
       view.container.querySelector(".status"),
-    ]).toEqual(["Tap or press Space to start", "0", 1, null]);
+    ]).toEqual(["Tap or press Space to fly", "0", 1, null]);
   });
 
   test("[005:FR-021] load error shows the template text and taps do nothing", async () => {

@@ -35,7 +35,7 @@ const clickAgain = (c: HTMLElement): void => {
   act(() => c.querySelector("button")?.click());
 };
 
-test("[005:FR-019] Play again calls resetResult and returns to ready; a second round submits again", async () => {
+test("[005:FR-019][007:FR-001] Play again calls resetResult and returns to ready; a second round submits again", async () => {
   const { fake, container } = await start();
   playToGround(container, driver);
   await flush();
@@ -47,7 +47,7 @@ test("[005:FR-019] Play again calls resetResult and returns to ready; a second r
     text(container, ".score"),
     container.querySelector(".over"),
     container.querySelector(".prize, .status"),
-  ]).toEqual(["Tap or press Space to start", "0", null, null]);
+  ]).toEqual(["Tap or press Space to fly", "0", null, null]);
   playToGround(container, driver);
   await flush();
   expect(fake.calls.submitResult).toEqual([0, 0]);

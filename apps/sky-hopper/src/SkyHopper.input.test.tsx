@@ -34,12 +34,12 @@ async function boot(opts: Parameters<typeof fakeAdapter>[0] = {}) {
 }
 
 describe("space", () => {
-  test("[005:FR-013] Space on the game root starts the round; repeat keydowns are ignored", async () => {
+  test("[005:FR-013][007:FR-001] Space on the game root starts the round; repeat keydowns are ignored", async () => {
     const { game, container, tracking } = await boot();
     for (let i = 0; i < 5; i++) pressSpace(game, { repeat: true });
     driver.frames(3, MS);
     expect([container.querySelector(".hint")?.textContent, tracking]).toEqual([
-      "Tap or press Space to start",
+      "Tap or press Space to fly",
       [{ name: "game_open" }],
     ]);
     pressSpace(game);
@@ -81,13 +81,13 @@ describe("space", () => {
     expect([first.defaultPrevented, repeat.defaultPrevented]).toEqual([true, true]);
   });
 
-  test("[005:FR-013] other keys do nothing", async () => {
+  test("[005:FR-013][007:FR-001] other keys do nothing", async () => {
     const { game, container, tracking } = await boot();
     act_key(game, "KeyA");
     act_key(game, "Enter");
     driver.frames(3, MS);
     expect([container.querySelector(".hint")?.textContent, tracking]).toEqual([
-      "Tap or press Space to start",
+      "Tap or press Space to fly",
       [{ name: "game_open" }],
     ]);
   });
