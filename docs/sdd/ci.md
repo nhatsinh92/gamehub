@@ -8,7 +8,7 @@ CI is built code-first: it is tooling with no user-facing behavior, exempt from 
 
 | Job | What it blocks | Principle | Proof (PR made to fail on purpose, closed unmerged) |
 |---|---|---|---|
-| `verify`: `pnpm turbo run lint check-types test --continue` | Lint violations (`max-lines-per-function` 60, `max-lines` 400), type errors, failing tests | III, AI-code contract | PR #5: a 61-line function → `max-lines-per-function` error, only problem reported, merge `BLOCKED` |
+| `verify`: `pnpm turbo run lint check-types test buildSdk --continue` (also builds every package's SDK) | Lint violations (`max-lines-per-function` 60, `max-lines` 400), type errors, failing tests, a package whose `buildSdk` fails | III, AI-code contract | PR #5: a 61-line function → `max-lines-per-function` error, only problem reported, merge `BLOCKED` |
 | `secrets`: gitleaks on every commit of the PR (`fetch-depth: 0`) | Secrets committed to git, **including ones deleted in a later commit** (still in history) | V | PR #3: fake GitHub PAT added, then deleted → `github-pat` found in the adding commit, merge `BLOCKED` |
 | `guard-deps`: `pnpm-lock.yaml` changed and no `deps-approved` label → fail | Dependencies added, upgraded or removed without a recorded reason | IV | PR #4: `picocolors` added as a direct devDependency (already a transitive one; lockfile changed 3 lines) → fail, merge `BLOCKED`; with the `deps-approved` label → re-run passes |
 | `spec-diff`: for each `specs/*/spec.md` changed in the PR and present on the base, compare base vs PR with `packages/spec-diff` (new or deleted specs are skipped) | A spec whose content changed without a Version bump; an unreadable spec, a missing or malformed Version, duplicate FR/SC IDs | I, CLAUDE.md Rule 1 | PR #11: one FR edited in `specs/001-spec-diff/spec.md`, Version left at 1.0.1 → `version-not-bumped`, exit 1, merge `BLOCKED` |
@@ -33,6 +33,7 @@ CI is built code-first: it is tooling with no user-facing behavior, exempt from 
 
 - **Gitleaks runs after the push.** When it fails, the secret is already on GitHub and must be rotated. GitHub push protection did not stop the fake token (off, or it ignores tokens that fail validation). To block before the remote: check push protection in Settings → Code security, or run gitleaks in a pre-commit hook.
 - **Gitleaks prints the commit author email** next to each finding. The email is already in commit metadata, but Actions logs of a public repo are public. Use the GitHub `noreply` email for commits if that matters.
+- **The `buildSdk` gate builds nothing yet.** Until a package defines a `buildSdk` script, turbo finds no package for the task and the gate runs no build.
 - **Explicit `any` is not linted** (`no-explicit-any` was dropped). Only review catches it.
 - **AI review is not a gate.** A future AI review step may only comment (`contents: read`, `pull-requests: write`), runs only with the `ai-review` label, never on fork PRs.
 
