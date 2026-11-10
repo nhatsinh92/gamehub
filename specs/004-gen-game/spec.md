@@ -6,7 +6,7 @@
 
 **Status**: Draft
 
-**Version**: 0.1.0
+**Version**: 0.1.1
 
 **Input**: User description: GitHub issue #28 "gen-game: create a new game from the scratch-card-example template". Every new game starts as a copy of `apps/scratch-card-example`. Copying by hand is where names go wrong (a package renamed but the README or a test still says the old name) and where build files get copied along. A generator makes every new game start the same way, and proves it: a game it creates passes every repo check before anyone writes gameplay.
 
@@ -149,4 +149,5 @@ Other defaults:
 
 ## Changelog
 
+- 0.1.1 (2026-11-10): note found in implementation: the template's `src/game-name.ts` comment uses `lucky-wheel` as an example, so the template's `[003:FR-012]` test fails for a game named `lucky-wheel`; the quickstart name `lucky-wheel` cannot pass FR-014 until the template comment changes (template change is out of scope, FR-011). Use another name (e.g. `demo-x`) for the end-to-end check.
 - 0.1.0 (2026-11-10): initial draft from issue #28.
