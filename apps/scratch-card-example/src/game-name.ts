@@ -1,6 +1,6 @@
 import pkg from "../package.json" with { type: "json" };
 
-/** "scratch-card-example" -> "ScratchCardExampleSDK" */
+/** "lucky-wheel" -> "LuckyWheelSDK" */
 export function toSdkGlobalName(name: string): string {
   const parts = name
     .split("-")

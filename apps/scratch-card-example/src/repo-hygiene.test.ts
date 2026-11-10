@@ -81,7 +81,8 @@ describe("README", () => {
 
 function walk(dir: string): string[] {
   return readdirSync(dir).flatMap((name) => {
-    if (name === "node_modules" || name === "dist") return [];
+    // generated folders, not source
+    if ([".turbo", "dist", "node_modules"].includes(name)) return [];
     const full = join(dir, name);
     return statSync(full).isDirectory() ? walk(full) : [full];
   });
