@@ -74,7 +74,7 @@ For trying many game ideas cheaply. Add the `ai-spike` label to an issue → one
 
 **`dev` rules:** only the spike workflow and the owner (syncing `main` into `dev`) push to it; it is never merged into `main`; `apps/storybook`'s `test` fails there by design (it lists the stories of `main`), so CI does not run it on `dev`.
 
-**Batch:** `.github/scripts/spike-batch.sh ideas.txt` (one idea per line) creates one issue per idea with `ai-spike-queue` and starts the first. Each run, when it ends, moves the oldest queued issue to `ai-spike`, so spikes run one at a time.
+**Batch:** `.github/scripts/spike-batch.sh ideas.txt` (one idea per line, `title | description`; `\n` in the description is a new line; a line without ` | ` is both title and body) creates one issue per idea with `ai-spike-queue` and starts the first. Each run, when it ends, moves the oldest queued issue to `ai-spike`, so spikes run one at a time.
 
 | Decision | Why |
 |---|---|
