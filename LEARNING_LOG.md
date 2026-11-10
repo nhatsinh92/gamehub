@@ -264,6 +264,12 @@ Mỗi Module một entry: **Đã làm gì · Quyết định và vì sao · Vấ
 - **Không commit file build.** Storybook build SDK của các game ngay lúc build, qua `dependsOn` của Turborepo (`pnpm turbo run build --filter=storybook`); deploy chạy đúng lệnh đó. Lý do: diff rác, file build lệch với code, và mâu thuẫn với luật "không commit `dist/`" của template. Nhiều version (như bản có CDN) thì dùng GitHub Releases, `releases.json` chỉ lưu URL; bắt đầu với chỉ version hiện tại.
 - **Bỏ script `build` (trang chạy độc lập) khỏi template**: Storybook và app chủ chỉ cần `buildSdk`; `dev` đủ để chạy độc lập trên máy. Issue 003: bỏ `build` khỏi mục Scripts, thêm vào Out of scope "a standalone production build of the dev page".
 - **Gate `buildSdk` (PR của người, vì `.github/` cấm AI sửa):** thêm task `buildSdk` vào `turbo.json` (trước đó chưa khai báo, turbo sẽ báo lỗi), job `verify` chạy `lint check-types test buildSdk --continue`, cập nhật `ci.md`. **Hạn chế:** chưa package nào có `buildSdk`, nên gate xanh mà không build gì cho tới khi template 003 merge; prompt bắt AI chạy `--dry-run` để thấy số package được build (0) và ghi hạn chế vào `ci.md`. Chứng minh thật sau 003 bằng một PR phá cố ý (entry của cấu hình build SDK trỏ tới file không tồn tại).
+- **003 template xong** qua pipeline: issue #25 → PR #26. Tên chỉ có một nguồn là `name` trong `package.json` (`src/game-name.ts` tính game id, tên global, tên file build); tên template chỉ còn trong README và test (test hygiene cho phép đúng các chỗ này).
+- **004 `gen-game` (issue):** package `packages/gen-game` (để turbo chạy test trong CI), CLI `pnpm gen-game <name>`; từ chối tên sai/trùng; không copy `node_modules`/`dist`/`.turbo`/`*.tsbuildinfo`; thay **cả 2 dạng tên** (kebab và `PascalSDK`) ở đúng các file chứa tên (`package.json`, README, test); không ghi đè, thất bại giữa chừng thì xoá thư mục dở; game sinh ra qua `lint check-types test buildSdk` mà không sửa gì; giữ tag `[003:FR-###]` trong test được copy (kiểm hợp đồng template); không tạo spec (pipeline đã tạo); lõi nhận thư mục làm tham số để test trên thư mục tạm.
+- **Vấn đề `guard-deps` cho game hàng loạt:** mỗi game mới làm lockfile đổi (thêm importer cho workspace mới) dù không thêm dependency, nên mọi PR game bị chặn tới khi gắn `deps-approved`. Lựa chọn: chấp nhận gắn label tay, hoặc sửa `guard-deps` chỉ chặn khi danh sách package bên ngoài trong lockfile đổi (PR của người).
+- **004 `gen-game` xong** qua pipeline: issue #28 → PR #29.
+- **Game đầu tiên `flappy-bird` (issue):** "How to start" bắt dùng `pnpm gen-game flappy-bird` + `pnpm install` (prompt `build` không biết generator); thay gameplay thẻ cào và test của nó, giữ test hợp đồng (SDK, tên, hygiene). Luật chơi viết thành câu kiểm được (3 trạng thái; một lần nhấn một flap; mỗi cặp ống cộng điểm một lần; độ khó có trần/sàn; game over → `submitResult(score)`; 3 sự kiện tracking). Số khởi đầu trong một object cấu hình, ghi rõ chỉnh sau bằng playtest. Behaviour phải giữ: bước thời gian cố định (60 Hz = 120 Hz), logic thuần + random có seed (tất định, test được), ẩn tab thì tạm dừng và không "nhảy" khi quay lại, giới hạn DPR của canvas ở 2. Out of scope: âm thanh/hình ảnh, leaderboard/chia sẻ, Storybook/e2e.
+- Lần đầu có **số liệu token cho một game thật** (bảng usage trong PR body): dùng để quyết định có làm luồng nhẹ cho game không.
 
 ---
 
@@ -276,6 +282,12 @@ Mỗi Module một entry: **Đã làm gì · Quyết định và vì sao · Vấ
 - **Đo usage:** mọi lệnh `claude` chạy qua `.github/scripts/run-claude.sh` với `--output-format json` → `usage.tsv` (turn, token input/cache/output, chi phí ước tính theo giá API, subtype) → bảng trong job summary và PR body (`.github/scripts/usage-table.sh`). Đã thử bằng `claude` giả: ghi đúng reply, giữ đúng exit code (cả khi lỗi), bảng tổng đúng.
 - **Gate của vòng lặp khớp với `pr.yml`:** biến `GATES = lint check-types test buildSdk`. Trước đó vòng lặp không chạy `buildSdk`, nên một PR có thể qua vòng lặp mà vẫn đỏ CI.
 - **Chặn đọc file lớn:** `.claude/settings.json` deny `Read` cho `pnpm-lock.yaml`, `node_modules/`, `dist/`, `.turbo/`.
+
+### Số liệu đầu tiên (issue #28, `gen-game`)
+- Tổng **khoảng 4,47 triệu token**, ước tính **3,05 USD** theo giá API; 145 turn. Dòng Total cũ chỉ cộng output (75.392), dễ đọc nhầm thành tổng token → sửa `usage-table.sh` thêm cột Tokens và tỷ lệ chi phí từng bước.
+- **Cache read chiếm khoảng 93% lượng token** (4,17 triệu): mỗi turn đọc lại toàn bộ context. Nhưng cache read có giá rẻ, nên chi phí đi theo hình dạng khác.
+- **Phiên `build-spec` (Opus) chiếm 64% chi phí** dù chỉ 40/145 turn: model đắt nhất, nhiều output nhất (42.857), context mỗi turn lớn nhất (~48k). `build-implement` (Sonnet) 63 turn chỉ 21%. Review + fix cộng lại ~15%.
+- Kết luận: chỗ tiết kiệm lớn nhất là **phiên spec**: luồng nhẹ cho game (spec ngắn, không plan/research/analyze) hoặc chạy phiên spec bằng Sonnet cho game sinh từ template.
 
 ### Để sau, cần số liệu từ bảng usage trước
 - Luồng nhẹ cho game hàng loạt (label riêng, spec ngắn chỉ có luật chơi, không plan/research/analyze).
