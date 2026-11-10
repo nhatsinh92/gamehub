@@ -1,0 +1,139 @@
+# AI spike: issue (a game idea) -> one Sonnet session -> playable game pushed to
+# `spike/issue-N`. No spec, no review, no PR: a spike is never merged
+# (constitution Principle I). Starts when someone with triage rights adds the
+# `ai-spike` label; when a run ends it starts the oldest `ai-spike-queue` issue.
+# See docs/sdd/ci.md#ai-spike-issue-to-spike.
+name: issue-to-spike
+
+on:
+  issues:
+    types: [labeled]
+
+permissions:
+  contents: read
+
+# One spike at a time across the repo, so a batch does not hit the usage limit
+# in parallel. GitHub keeps only one pending run per group, hence the queue label.
+concurrency:
+  group: ai-spike
+  cancel-in-progress: false
+
+jobs:
+  spike:
+    if: github.event.label.name == 'ai-spike'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      issues: write
+    env:
+      ISSUE: ${{ github.event.issue.number }}
+      BRANCH: spike/issue-${{ github.event.issue.number }}
+      SENDER: ${{ github.event.sender.login }}
+      MODEL: claude-sonnet-5-5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false # Claude's Bash must not be able to push
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1 (reads packageManager)
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: npm install -g @anthropic-ai/claude-code@2.1.318
+
+      - name: Prepare (issue text, branch)
+        env:
+          GH_TOKEN: ${{ secrets.AI_BOT_TOKEN }}
+        run: |
+          AI="$RUNNER_TEMP/ai"
+          echo "AI=$AI" >> "$GITHUB_ENV"
+          mkdir -p "$AI"
+          gh auth setup-git
+          if git ls-remote --exit-code origin "refs/heads/$BRANCH" >/dev/null; then
+            echo "::error::Branch $BRANCH already exists. Delete it to re-run."
+            exit 1
+          fi
+          # Issue text goes to a file, never into a shell command (script injection).
+          gh issue view "$ISSUE" --json title,body --jq '"# " + .title + "\n\n" + .body' > "$AI/issue.md"
+          git config user.name "gamehub-ai"
+          git config user.email "gamehub-ai@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+          echo "BASE_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+
+      - name: Build
+        id: build
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        run: |
+          rc=0
+          .github/scripts/run-claude.sh spike "$AI/build.md" write \
+            -p "Follow prompts/issue-to-spike/build@v1.md exactly. The issue (#$ISSUE) is in $AI/issue.md." \
+            --model "$MODEL" --add-dir "$AI" --permission-mode acceptEdits --max-turns 80 \
+            --allowedTools "Read,Write,Edit,Glob,Grep,Bash(pnpm:*),Bash(node:*),Bash(git add:*),Bash(git commit:*),Bash(git status:*),Bash(git diff:*)" || rc=$?
+          git add -A && git commit -q -m "chore: uncommitted spike output (#$ISSUE)" || true
+          # Claude's last line names the game; only trust it if it is a kebab-case app folder.
+          name=$(tail -n 1 "$AI/build.md" | sed -n 's/^DONE \([a-z0-9][a-z0-9-]*\)$/\1/p')
+          [ -n "$name" ] && [ -d "apps/$name" ] || name=""
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+          [ "$rc" = 0 ] || { echo "::error::claude exited $rc"; exit "$rc"; }
+
+      - name: Gates (reported, not blocking)
+        id: gates
+        if: steps.build.outputs.name != ''
+        env:
+          NAME: ${{ steps.build.outputs.name }}
+        run: |
+          if pnpm turbo run lint check-types test buildSdk --filter="$NAME" --continue > "$AI/gates.log" 2>&1
+          then echo "gates=pass" >> "$GITHUB_OUTPUT"
+          else echo "gates=fail" >> "$GITHUB_OUTPUT"; tail -n 60 "$AI/gates.log"; fi
+
+      - name: Push
+        id: push
+        if: always() && env.BASE_SHA != ''
+        env:
+          GH_TOKEN: ${{ secrets.AI_BOT_TOKEN }}
+        run: |
+          [ "$(git rev-list --count "$BASE_SHA"..HEAD)" != 0 ] || exit 0
+          for i in 1 2 3; do
+            git push origin "HEAD:refs/heads/$BRANCH" && { echo "pushed=true" >> "$GITHUB_OUTPUT"; break; }
+            [ "$i" = 3 ] && exit 1
+            sleep $((i * 30))
+          done
+
+      - name: Usage summary
+        if: always() && env.AI != ''
+        run: |
+          { echo "## Claude usage (spike, issue #$ISSUE)"; echo; .github/scripts/usage-table.sh; } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Notify
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }} # posted by github-actions[bot], so the @mention notifies
+          NAME: ${{ steps.build.outputs.name }}
+          GATES: ${{ steps.gates.outputs.gates }}
+          PUSHED: ${{ steps.push.outputs.pushed }}
+        run: |
+          run="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          if [ -n "$NAME" ] && [ "$PUSHED" = true ]; then
+            msg="@$SENDER Spike \`$NAME\` is on branch \`$BRANCH\` (gates: $GATES). To play:
+          \`git fetch origin $BRANCH && git checkout $BRANCH && pnpm install && pnpm --filter $NAME dev\`
+          Spikes are never merged: to keep the game, open an \`ai-build\` issue for it. Run: $run"
+          else
+            msg="@$SENDER Spike stopped: $(tail -n 1 "$AI/build.md" 2>/dev/null). Partial work (if any) is on \`$BRANCH\`. Run: $run"
+            gh issue edit "$ISSUE" --add-label ai-needs-human || true
+          fi
+          { echo "$msg"; echo; echo "<details><summary>Token usage</summary>"; echo; .github/scripts/usage-table.sh; echo; echo "</details>"; } > "$AI/comment.md"
+          gh issue comment "$ISSUE" --body-file "$AI/comment.md"
+          gh issue edit "$ISSUE" --remove-label ai-spike || true
+
+      # A label added with GITHUB_TOKEN starts no workflow, so the bot token moves it.
+      - name: Start next queued spike
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.AI_BOT_TOKEN }}
+        run: |
+          next=$(gh issue list --label ai-spike-queue --state open --json number --jq 'sort_by(.number) | .[0].number // empty')
+          [ -z "$next" ] || gh issue edit "$next" --remove-label ai-spike-queue --add-label ai-spike

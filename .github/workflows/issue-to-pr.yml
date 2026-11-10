@@ -30,9 +30,9 @@ jobs:
       MAX_FIX_ROUNDS: 1
       # Must match the `verify` job in pr.yml, or a PR that passes here fails CI.
       GATES: lint check-types test buildSdk
-      # Opus where judgment matters (spec, plan, tasks); Sonnet to write and
-      # review code (review is a checklist against spec and diff).
-      SPEC_MODEL: claude-opus-5-5
+      # Sonnet everywhere: Opus on the spec phase was 58% of a run's cost (PR #31).
+      # Kept as its own variable so the spec phase can go back to Opus alone.
+      SPEC_MODEL: claude-sonnet-5-5
       CODE_MODEL: claude-sonnet-5-5
       REVIEW_MODEL: claude-sonnet-5-5
       # Same tools for build and fix. No `git push`, no network tools: the
