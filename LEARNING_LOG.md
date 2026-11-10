@@ -242,6 +242,47 @@ Mỗi Module một entry: **Đã làm gì · Quyết định và vì sao · Vấ
 
 ---
 
+## Phần 3 — Nền tảng game theo GameHub cũ: core → template → gen-game → storybook (bắt đầu 2026-11-09)
+
+### Bối cảnh
+- Đã có pipeline `issue-to-pr`: issue có label `ai-build` → Spec Kit (specify → plan → tasks → analyze → implement) → vòng review/fix (tối đa 3, reviewer là phiên riêng chỉ đọc) → PR → tag người duyệt. AI không push (không thấy token), không merge.
+- Đối chiếu với GameHub cũ (`ecom-game-hub`): React 19 + Vite 7; `packages/core` (GameContext, adapter Local/Remote, client HTTP, ký request WASM, hook); API `/{gameId}/v1/init`, `/me`, `/reward`, `/nonce`; template `scratch-card-example` (`App`, `GameSDK` với `init`/`destroy` + Shadow DOM + biến toàn cục `window.<Tên>SDK`, `Game`; 2 cấu hình Vite: chạy độc lập và build SDK IIFE); `gen-game` copy template rồi đổi tên package; Storybook tải SDK từ CDN theo version (`releases.json` mỗi game).
+- **Chỗ trôi của template cũ (bị `gen-game` nhân bản sang mọi game):** `check-types` gọi `next typegen` dù không dùng Next.js; tên biến toàn cục trong cấu hình build (`ScratchCardSDK`) lệch tên gán thật (`ScratchCardExampleSDK`); `gameId` mặc định lệch dữ liệu mock; README của Next.js; `tsconfig.tsbuildinfo` bị copy theo; adapter đọc `response?.data?.data` không validate; không có test tự động.
+
+### Quyết định và vì sao
+- **Thứ tự:** 002 `game-core` tối thiểu → 003 template `scratch-card-example` → 004 `gen-game` → 005 Storybook → sau đó tạo game hàng loạt qua GitHub issue.
+- **`core` giữ thành package riêng** như bản cũ: mọi game dùng chung.
+- **Pipeline cho phép AI thêm dependency**, người review gắn label `deps-approved` (gate `guard-deps` vẫn chặn nếu thiếu label).
+- **Stack:** React + Vite, **bỏ styled-components**; dùng **`fetch` có sẵn** thay axios (bớt dependency, dễ test bằng `fetch` giả); **thêm thư viện test cho component React** (Testing Library + môi trường DOM).
+- **Playwright để sau.** Đã cân nhắc: chỉ nó kiểm được bundle SDK thật (biến toàn cục `window.<Tên>SDK`, Shadow DOM, CSS không lọt, canvas), và nếu đặt trong template thì mọi game sinh ra tự kiểm được chính nó. Hoãn vì chưa cần cho `game-core`.
+- **002 `game-core` làm qua GitHub issue** (pipeline `issue-to-pr`), không chạy Spec Kit bằng tay. Issue không nhắc tới GameHub cũ (repo cá nhân, viết lại độc lập). Issue ghi rõ: lý do (mọi game cần chung một client đã được test, response phải được validate); contract với backend có sẵn (endpoint, header `X-Access-Token`, response `{ data }`, 401 trả về như một lỗi bình thường, **không refresh token**); luật PO; hành vi phải giữ (validate, lỗi mạng/5xx/không phải JSON thành lỗi, token không log); out of scope chỉ 2 dòng (refresh/retry/cache; template và UI); dependency được phép.
+- **Tiêu chí cho mục Out of scope:** mỗi dòng phải trả lời được "nếu không ghi, người đọc (AI) có tự làm thứ này không?". Bản nháp đầu liệt kê tính năng của GameHub cũ (captcha, leaderboard, âm thanh…) mà repo và issue không hề nhắc tới: vừa thiếu ngữ cảnh, vừa có thể gợi ý cho AI. Thứ AI hay tự thêm với một HTTP client có xác thực là refresh token, retry, cache, nên ghi rõ những thứ đó. Lý do: những gì đã biết chắc phải ghi ra, vì prompt `build` chỉ cho tối đa 3 giả định và AI tự thiết kế API sẽ không khớp server thật.
+- **002 `game-core` xong** qua pipeline: issue #18 → PR #22 (spec 1.0.0 Implemented).
+- **003 template `scratch-card-example` (issue):** Why nhấn mạnh "mọi thứ trong template sẽ có trong mọi game"; SDK contract ghi chi tiết (global `window.ScratchCardExampleSDK`, `init(container, config)`/`destroy()`, Shadow DOM có style riêng, init 2 lần thì thay game cũ, container không tồn tại thì báo lỗi rõ); **tên game, tên package, tên global định nghĩa ở một chỗ** để `gen-game` đổi tên một lần; gameplay cụ thể (cào ≥ 50% → `submitResult(1)`, 3 sự kiện tracking, tiến độ cào là hàm thuần vì happy-dom không có canvas); behaviour phải giữ (tên global trong file build khớp, không commit `dist/`/`*.tsbuildinfo`, README đúng template, token không log); out of scope 4 dòng (Playwright, art/âm thanh, generator/Storybook, môi trường ngoài dev/production).
+- **Lỗ hổng CI phát hiện khi viết issue 003:** `pr.yml` chỉ chạy `lint check-types test`, không chạy `build`/`buildSdk`, nên SDK build lỗi vẫn xanh. AI không được sửa `.github/`, nên người phải thêm gate này (nên làm trước issue 003; `gen-game` cũng cần nó).
+- **Storybook cần `buildSdk`, không cần `build`** (trang chạy độc lập): Storybook nhúng game giống app chủ, tức là tải file SDK. Gate CI cần cho `buildSdk`.
+- **Không commit file build.** Storybook build SDK của các game ngay lúc build, qua `dependsOn` của Turborepo (`pnpm turbo run build --filter=storybook`); deploy chạy đúng lệnh đó. Lý do: diff rác, file build lệch với code, và mâu thuẫn với luật "không commit `dist/`" của template. Nhiều version (như bản có CDN) thì dùng GitHub Releases, `releases.json` chỉ lưu URL; bắt đầu với chỉ version hiện tại.
+- **Bỏ script `build` (trang chạy độc lập) khỏi template**: Storybook và app chủ chỉ cần `buildSdk`; `dev` đủ để chạy độc lập trên máy. Issue 003: bỏ `build` khỏi mục Scripts, thêm vào Out of scope "a standalone production build of the dev page".
+- **Gate `buildSdk` (PR của người, vì `.github/` cấm AI sửa):** thêm task `buildSdk` vào `turbo.json` (trước đó chưa khai báo, turbo sẽ báo lỗi), job `verify` chạy `lint check-types test buildSdk --continue`, cập nhật `ci.md`. **Hạn chế:** chưa package nào có `buildSdk`, nên gate xanh mà không build gì cho tới khi template 003 merge; prompt bắt AI chạy `--dry-run` để thấy số package được build (0) và ghi hạn chế vào `ci.md`. Chứng minh thật sau 003 bằng một PR phá cố ý (entry của cấu hình build SDK trỏ tới file không tồn tại).
+
+---
+
+## Phần 4 — Giảm token của pipeline `issue-to-pr` (2026-11-10)
+
+### Đã có sẵn trước khi tối ưu
+- Model theo bước (Opus cho spec/plan/tasks, Sonnet cho implement/fix/review); build tách 2 phiên (`spec`, `implement`); 1 vòng fix; gate đỏ thì không gọi AI review; reviewer đọc `diff.patch` + `commits.txt` thay vì tự dò bằng git.
+
+### Đã thêm
+- **Đo usage:** mọi lệnh `claude` chạy qua `.github/scripts/run-claude.sh` với `--output-format json` → `usage.tsv` (turn, token input/cache/output, chi phí ước tính theo giá API, subtype) → bảng trong job summary và PR body (`.github/scripts/usage-table.sh`). Đã thử bằng `claude` giả: ghi đúng reply, giữ đúng exit code (cả khi lỗi), bảng tổng đúng.
+- **Gate của vòng lặp khớp với `pr.yml`:** biến `GATES = lint check-types test buildSdk`. Trước đó vòng lặp không chạy `buildSdk`, nên một PR có thể qua vòng lặp mà vẫn đỏ CI.
+- **Chặn đọc file lớn:** `.claude/settings.json` deny `Read` cho `pnpm-lock.yaml`, `node_modules/`, `dist/`, `.turbo/`.
+
+### Để sau, cần số liệu từ bảng usage trước
+- Luồng nhẹ cho game hàng loạt (label riêng, spec ngắn chỉ có luật chơi, không plan/research/analyze).
+- Giảm `--max-turns` theo số turn thực tế.
+
+---
+
 ## Nợ
 
 - **M0:** chưa tự liệt kê 5 rủi ro kỹ thuật và chưa tự lập luận cách tách brief thành feature (đã xem bản tham chiếu của mentor). Trả lại trước Module 14.
