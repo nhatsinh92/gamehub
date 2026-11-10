@@ -8,7 +8,7 @@ The SDK (`SkyHopperSDK.init(container, config)`, `destroy()`), the Shadow DOM mo
 |---|---|
 | loading | `.status` "Loading…" |
 | load error | `.status` "Could not load the game. Please try again later."; no canvas |
-| ready | `canvas.play` (focus target is the `.game` root, `tabIndex=0`); `.hint` "Tap or press Space to start"; `.score` "0" |
+| ready | `canvas.play` (focus target is the `.game` root, `tabIndex=0`); `.hint` "Tap or press Space to fly"; `.score` "0" |
 | playing | `canvas.play`; `.score` current score |
 | over, waiting | `canvas.play`; `.over` holding `.final-score` "Score: N" and `.best-score` "Best: B"; no button |
 | over, answered | as waiting plus the outcome (`.prize` reward name, or `.status` server message, or `.status` "Something went wrong. Please try again.") and `button` "Play again" |
