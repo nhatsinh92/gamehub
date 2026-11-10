@@ -1,7 +1,9 @@
 // @vitest-environment happy-dom
+import { act } from "react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { GAME_ID, SDK_GLOBAL_NAME } from "./game-name.ts";
 import * as sdk from "./sdk.ts";
+import { destroy as rawDestroy, init as rawInit } from "./sdk.ts";
 import { GAME_CSS } from "./styles.ts";
 import {
   TOKEN,
@@ -18,6 +20,14 @@ const consoleSpies = (["error", "log", "warn", "info", "debug"] as const).map(
 const [errorSpy] = consoleSpies;
 let urls: string[] = [];
 let headersSeen: HeadersInit[] = [];
+
+// React state updates must happen inside act()
+function initIn(container: string | Element, config: unknown): void {
+  act(() => rawInit(container, config));
+}
+function destroyIn(): void {
+  act(() => rawDestroy());
+}
 
 function cfg(extra: Record<string, unknown> = {}): Record<string, unknown> {
   return {
@@ -36,6 +46,8 @@ function host(): HTMLElement {
 }
 
 beforeEach(() => {
+  (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT =
+    true;
   urls = [];
   headersSeen = [];
   consoleSpies.forEach((s) => s.mockClear());
@@ -57,7 +69,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  sdk.destroy();
+  destroyIn();
   document.body.replaceChildren();
   vi.unstubAllGlobals();
 });
@@ -71,13 +83,13 @@ describe("shape", () => {
 describe("init", () => {
   test("[003:FR-005] selector and Element both render one game", async () => {
     const a = host();
-    sdk.init("#game", cfg());
+    initIn("#game", cfg());
     await flush();
     expect(a.shadowRoot?.querySelectorAll(".game").length).toEqual(1);
-    sdk.destroy();
+    destroyIn();
     const b = document.createElement("div");
     document.body.appendChild(b);
-    sdk.init(b, cfg());
+    initIn(b, cfg());
     await flush();
     expect(b.shadowRoot?.querySelectorAll(".game").length).toEqual(1);
   });
@@ -86,7 +98,7 @@ describe("init", () => {
     const el = host();
     const headBefore = [...document.head.children];
     const bodyBefore = [...document.body.children];
-    sdk.init(el, cfg());
+    initIn(el, cfg());
     await flush();
     const kids = [...(el.shadowRoot?.children ?? [])];
     expect(kids.map((k) => k.tagName)).toEqual(["STYLE", "DIV"]);
@@ -101,37 +113,37 @@ describe("init", () => {
 
   test("[003:FR-007] init twice replaces the game", async () => {
     const el = host();
-    sdk.init(el, cfg());
-    sdk.init(el, cfg());
+    initIn(el, cfg());
+    initIn(el, cfg());
     await flush();
     expect(el.shadowRoot?.querySelectorAll(".game").length).toEqual(1);
     const second = document.createElement("div");
     document.body.appendChild(second);
-    sdk.init(second, cfg());
+    initIn(second, cfg());
     await flush();
     expect(el.shadowRoot?.childNodes.length).toEqual(0);
     expect(second.shadowRoot?.querySelectorAll(".game").length).toEqual(1);
   });
 
   test("[003:FR-009] destroy empties container and shadow root; repeat is a no-op", async () => {
-    sdk.destroy();
+    destroyIn();
     const el = host();
-    sdk.init(el, cfg());
+    initIn(el, cfg());
     await flush();
-    sdk.destroy();
+    destroyIn();
     expect(el.childNodes.length).toEqual(0);
     expect(el.shadowRoot?.childNodes.length).toEqual(0);
-    sdk.destroy();
+    destroyIn();
     expect(errorSpy?.mock.calls).toEqual([]);
   });
 
   test("[003:FR-010] sizes on the game root", async () => {
     const el = host();
-    sdk.init(el, cfg({ width: 200, height: 300 }));
+    initIn(el, cfg({ width: 200, height: 300 }));
     await flush();
     const game = el.shadowRoot?.querySelector(".game") as HTMLElement;
     expect([game.style.width, game.style.height]).toEqual(["200px", "300px"]);
-    sdk.init(el, cfg());
+    initIn(el, cfg());
     await flush();
     const dflt = el.shadowRoot?.querySelector(".game") as HTMLElement;
     expect([dflt.style.width, dflt.style.height]).toEqual(["360px", "480px"]);
@@ -139,7 +151,7 @@ describe("init", () => {
 
   test("[003:FR-011] host tracking function gets the events", async () => {
     const track = vi.fn();
-    sdk.init(host(), cfg({ sendTrackingFunc: track }));
+    initIn(host(), cfg({ sendTrackingFunc: track }));
     await flush();
     expect(track.mock.calls).toEqual([[{ name: "game_open" }]]);
   });
@@ -219,7 +231,7 @@ describe("bad input", () => {
 describe("embedded round", () => {
   test("[003:FR-003] [003:FR-024] only game-core URLs; token only in header; no console output", async () => {
     const el = host();
-    sdk.init(el, cfg());
+    initIn(el, cfg());
     await flush();
     scratchAll(el.shadowRoot?.querySelector("canvas.cover") ?? el);
     await flush();
