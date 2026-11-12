@@ -26,6 +26,8 @@ env:
   ISSUE: ${{ github.event.issue.number }}
   BRANCH: spike/issue-${{ github.event.issue.number }}
   SENDER: ${{ github.event.sender.login }}
+  # From the label list in the event, never from the issue text. Only someone with triage rights can add the label.
+  DEPS_APPROVED: ${{ contains(github.event.issue.labels.*.name, 'deps-approved') }}
 
 jobs:
   build:
@@ -83,7 +85,7 @@ jobs:
         run: |
           rc=0
           .github/scripts/run-claude.sh spike "$AI/build.md" write \
-            -p "Follow prompts/issue-to-spike/build@v1.md exactly. The issue (#$ISSUE) is in $AI/issue.md." \
+            -p "Follow prompts/issue-to-spike/build@v1.md exactly. The issue (#$ISSUE) is in $AI/issue.md. Dependencies approved: $DEPS_APPROVED." \
             --model "$MODEL" --add-dir "$AI" --permission-mode acceptEdits --max-turns 80 \
             --allowedTools "Read,Write,Edit,Glob,Grep,Bash(pnpm:*),Bash(node:*),Bash(git add:*),Bash(git commit:*),Bash(git status:*),Bash(git diff:*)" || rc=$?
           git add -A && git commit -q -m "chore: uncommitted spike output (#$ISSUE)" || true
@@ -190,7 +192,9 @@ jobs:
       # dev has no review, so the prompt's file rules are enforced here: the spike
       # changes only a new game's folder, its story and the lockfile; the merge commit
       # `build` made is a plain merge of it (lockfile aside); package.json is as
-      # generated; the lockfile adds no third-party package.
+      # generated; the lockfile adds no third-party package. With the `deps-approved`
+      # label on the issue, `dependencies`/`devDependencies` and the lockfile are free
+      # to change (scripts and every other file rule still apply).
       - name: Guard and push dev
         id: dev
         if: env.NAME != '' && needs.build.outputs.dev == 'true' && steps.push.outputs.pushed == 'true'
@@ -212,9 +216,10 @@ jobs:
           tree=$(git merge-tree --write-tree origin/dev "$BRANCH" | head -n 1)
           other=$(git diff --name-only "$tree" spike-dev | grep -vx pnpm-lock.yaml || true)
           [ -z "$other" ] || fail "merge commit differs from a plain merge: $(echo $other)"
-          # Same as the template except the name: no new dependency, no new (lifecycle) script.
+          # Same as the template except the name: no new dependency (unless approved), no new (lifecycle) script.
           node -e '
-            const [a, b] = process.argv.slice(1).map((s) => { const p = JSON.parse(s); delete p.name; return JSON.stringify(p); });
+            const drop = process.env.DEPS_APPROVED === "true" ? ["name", "dependencies", "devDependencies"] : ["name"];
+            const [a, b] = process.argv.slice(1).map((s) => { const p = JSON.parse(s); drop.forEach((k) => delete p[k]); return JSON.stringify(p); });
             if (a !== b) process.exit(1);' \
             "$(git show "spike-dev:apps/$NAME/package.json")" \
             "$(git show "$GITHUB_SHA:apps/scratch-card-example/package.json")" \
@@ -223,7 +228,7 @@ jobs:
           # shortcut: when main and dev differ in third-party packages, this fails until main is merged into dev.
           strip() { git show "$1:pnpm-lock.yaml" | awk '/^importers:/ { s = 1; next } /^[a-z]/ { s = 0 } !s'; }
           new=$(strip spike-dev)
-          [ "$new" = "$(strip origin/dev)" ] || [ "$new" = "$(strip "$GITHUB_SHA")" ] \
+          [ "$DEPS_APPROVED" = true ] || [ "$new" = "$(strip origin/dev)" ] || [ "$new" = "$(strip "$GITHUB_SHA")" ] \
             || fail "pnpm-lock.yaml adds or changes third-party packages (or main changed dependencies: merge main into dev)"
           git push origin "spike-dev:refs/heads/dev"
           echo "merged=true" >> "$GITHUB_OUTPUT"
