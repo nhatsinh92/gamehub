@@ -20,7 +20,11 @@ Print `ABORT: <one-line reason>` as your last line and change nothing more if:
 
 - the issue is not a game idea, or is a recreation of a specific existing game
   (its name, characters, art, levels or look);
-- the game needs a new dependency (no `pnpm add`).
+- the game needs a new dependency and the task message says
+  `Dependencies approved: false` (no `pnpm add`). When it says `true`, you may
+  run `pnpm --filter <name> add <package>` for packages the game really needs
+  (nothing the standard library or an installed package covers), and list each
+  with a one-line reason under `## Dependencies` in `apps/<name>/README.md`.
 
 ## Steps
 
