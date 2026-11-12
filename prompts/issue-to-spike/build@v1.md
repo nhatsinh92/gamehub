@@ -24,7 +24,7 @@ Print `ABORT: <one-line reason>` as your last line and change nothing more if:
   `Dependencies approved: false` (no `pnpm add`). When it says `true`, you may
   run `pnpm --filter <name> add <package>` for packages the game really needs
   (nothing the standard library or an installed package covers), and list each
-  with a one-line reason under `## Dependencies` in `apps/<name>/README.md`.
+  with a one-line reason in the `## What this is` section of `apps/<name>/README.md` (no new heading: the template test lists the README headings).
 
 ## Steps
 
